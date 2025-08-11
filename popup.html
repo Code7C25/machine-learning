@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Cheapy</title>
-        <link rel="stylesheet" href="popup.css">
-    </head>
-    <body>
-        <div id="container">
-            <h1>Cheapy 🛒</h1>
-            <p>Comparador de precios:</p>
-            <ul id="tiendas">
-                <!-- Lista dinámica -->
-                 
-            </ul>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cheapy</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="icons/icon.png" alt="Cheapy Logo" class="logo">
+            <h1>Cheapy</h1>
         </div>
-        <script src="popup.js"></script>
-    </body>
-</html> 
-<!-- master/main -->
+        <p class="description">Resultados para tu última búsqueda:</p>
+        <div id="results-container">
+            <p id="status-text">Realiza una búsqueda en Google para ver los enlaces.</p>
+            <ul id="links-list"></ul>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

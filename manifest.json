@@ -3,13 +3,22 @@
     "name": "Cheapy",
     "version": "1.0",
     "description": "Compara precios en distintas tiendas online.",
+    "icons": {
+        "16": "icons/Ic_message_48px.svg.png",
+        "48": "icons/Ic_message_48px.svg.png",
+        "128": "icons/Ic_message_48px.svg.png"
+    },
     "action": {
         "default_popup": "popup.html",
         "default_icon": {
-            "16": "icons/icon.png",
-            "48": "icons/icon.png",
-            "128": "icons/icon.png"
+            "16": "icons/Ic_message_48px.svg.png",
+            "48": "icons/Ic_message_48px.svg.png",
+            "128": "icons/Ic_message_48px.svg.png"
         }
     },
-    "permissions": []
+    "permissions": ["storage", "webNavigation"],
+    "host_permissions": ["*://*.google.com/*"],
+    "background": {
+        "service_worker": "background.js"
+    }
 }
