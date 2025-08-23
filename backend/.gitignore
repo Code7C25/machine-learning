@@ -1,0 +1,4 @@
+.venv/
+productos.db
+__pycache__/
+.env
