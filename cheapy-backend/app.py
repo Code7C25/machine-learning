@@ -3,8 +3,21 @@ import json
 import threading
 from fastapi import FastAPI, HTTPException
 import sys
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Cheapy Scraper API")
+
+origins = [
+    "*",  # Permitir todas las fuentes (no recomendado para producción)
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Permite todos los métodos (GET, POST, etc.)
+    allow_headers=["*"], # Permite todas las cabeceras
+)
 
 # La ruta completa y explícita a tu ejecutable de scrapy.exe.
 SCRAPY_PATH = r"C:\Users\Usuario\AppData\Local\Programs\Python\Python313\Scripts\scrapy.exe"

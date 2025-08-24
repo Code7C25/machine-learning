@@ -1,0 +1,5 @@
+para iniciar ubicord o cualquier accion de python por alguna razon la PC mia necesita poner la ubicacion exacta y para no estar buscando la ruta cada vez que me conecte los anoto en este txt
+
+"C:\Users\Usuario\AppData\Local\Programs\Python\Python313\Scripts\uvicorn.exe" app:app --reload *** esto es para iniciar el server
+
+"C:\Users\Usuario\AppData\Local\Programs\Python\Python313\Scripts\pip.exe" install -r requirements.txt *** para instalar las api necesarias
