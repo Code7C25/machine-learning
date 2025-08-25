@@ -69,3 +69,51 @@ h1 {
 #status-text {
     color: #606770;
 }
+
+.filters-container {
+    background-color: #f7f7f7;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.filter-group {
+    margin-bottom: 10px;
+    text-align: left;
+}
+
+.filter-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.filter-group input[type="number"] {
+    width: 95%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.slider {
+    width: 100%;
+}
+
+#filter-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    margin-top: 10px;
+}
+
+#filter-button:hover {
+    background-color: #0056b3;
+}

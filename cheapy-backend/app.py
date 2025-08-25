@@ -1,85 +1,101 @@
 import subprocess
 import json
-import threading
 from fastapi import FastAPI, HTTPException
-import sys
-from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
+import re
 
-app = FastAPI(title="Cheapy Scraper API")
-
-origins = [
-    "*",  # Permitir todas las fuentes (no recomendado para producción)
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"], # Permite todos los métodos (GET, POST, etc.)
-    allow_headers=["*"], # Permite todas las cabeceras
-)
+app = FastAPI(title="Cheapy Scraper API - Mercado Libre Only")
 
 # La ruta completa y explícita a tu ejecutable de scrapy.exe.
 SCRAPY_PATH = r"C:\Users\Usuario\AppData\Local\Programs\Python\Python313\Scripts\scrapy.exe"
 
 
-def run_spider(spider_name: str, query: str, results_list: list):
-    """
-    Ejecuta un spider de Scrapy como un subproceso y añade sus resultados a una lista.
-    """
-    # --- ¡ESTA ES LA LÍNEA CORREGIDA Y DEFINITIVA! ---
-    # Unimos la salida y el formato en un solo argumento "-o -:jsonlines"
-    command = [
-        SCRAPY_PATH,
-        "crawl",
-        spider_name,
-        "-a", f"query={query}",
-        "-o", "-:jsonlines", # SALIDA: consola (-), FORMATO: jsonlines
-        "--nolog"
-    ]
-    
+def clean_price(price_str: str) -> Optional[float]:
+    """Convierte un string de precio a un número flotante."""
+    if not isinstance(price_str, str):
+        return None
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=True,
-            encoding='utf-8',
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
-        
-        for line in result.stdout.strip().split('\n'):
-            if line:
-                results_list.append(json.loads(line))
-                
-    except subprocess.CalledProcessError as e:
-        print(f"Error ejecutando el spider '{spider_name}': {e.stderr}")
-    except FileNotFoundError:
-        print(f"ERROR: No se pudo encontrar 'scrapy.exe' en la ruta: {SCRAPY_PATH}")
-    except Exception as e:
-        print(f"Error inesperado con el spider '{spider_name}': {e}")
+        cleaned_str = re.sub(r'[^\d,]', '', price_str).replace(',', '.')
+        return float(cleaned_str)
+    except (ValueError, TypeError):
+        print(f"ADVERTENCIA: No se pudo convertir el precio '{price_str}' a número.")
+        return None
 
 
 @app.get("/buscar")
-def buscar_producto(q: str):
+def buscar_producto(
+    q: str,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    min_reliability: Optional[int] = None
+):
     """
-    Inicia los spiders en hilos separados, cada uno ejecutando un subproceso de Scrapy.
+    Ejecuta el spider de Mercado Libre y filtra los resultados.
     """
     if not q:
         raise HTTPException(status_code=400, detail="El parámetro 'q' es requerido.")
 
-    results = []
-    
-    ebay_thread = threading.Thread(target=run_spider, args=("ebay", q, results))
-    ml_thread = threading.Thread(target=run_spider, args=("mercadolibre", q, results))
-    
-    ebay_thread.start()
-    ml_thread.start()
-    
-    ebay_thread.join(timeout=30.0)
-    ml_thread.join(timeout=30.0)
+    print("\n" + "="*50)
+    print(f"NUEVA BÚSQUEDA (SOLO ML): '{q}'")
+    print(f"Filtros recibidos: min_price={min_price}, max_price={max_price}, min_reliability={min_reliability}")
+    print("="*50)
 
-    if not results:
-        return {"query": q, "message": "No se encontraron resultados."}
+    # --- Ejecutamos SOLAMENTE el spider de Mercado Libre ---
+    command = [
+        SCRAPY_PATH, "crawl", "mercadolibre",
+        "-a", f"query={q}",
+        "-o", "-:jsonlines",
+        "--nolog"
+    ]
+    
+    all_results = []
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, check=True,
+            encoding='utf-8', creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                all_results.append(json.loads(line))
+    except Exception as e:
+        print(f"Error crítico al ejecutar el subproceso de Scrapy: {e}")
+        # Devolvemos un error claro si Scrapy falla
+        raise HTTPException(status_code=500, detail="El proceso de scraping falló.")
+    
+    print(f"\nSe encontraron {len(all_results)} resultados de ML antes de filtrar.")
+    print("--- INICIANDO PROCESO DE FILTRADO ---")
+
+    # --- Lógica de Filtrado (la misma que teníamos, con logging) ---
+    filtered_results = []
+    for i, item in enumerate(all_results):
+        print(f"\n[Item {i+1}] Procesando: {item.get('title', 'SIN TITULO')}")
         
-    return {"query": q, "results": results}
+        item_price_str = item.get('price')
+        item_price_num = clean_price(item_price_str)
+        item_reliability = item.get('reliability_score', 0)
+        
+        print(f"  - Precio (str): '{item_price_str}' -> Precio (num): {item_price_num}")
+        print(f"  - Confiabilidad: {item_reliability}")
+
+        passes_min_price = min_price is None or (item_price_num is not None and item_price_num >= min_price)
+        passes_max_price = max_price is None or (item_price_num is not None and item_price_num <= max_price)
+        passes_reliability = min_reliability is None or item_reliability >= min_reliability
+        
+        print(f"  - ¿Pasa min_price ({min_price})? -> {passes_min_price}")
+        print(f"  - ¿Pasa max_price ({max_price})? -> {passes_max_price}")
+        print(f"  - ¿Pasa min_reliability ({min_reliability})? -> {passes_reliability}")
+        
+        if passes_min_price and passes_max_price and passes_reliability:
+            filtered_results.append(item)
+            print("  --> RESULTADO: INCLUIDO")
+        else:
+            print("  --> RESULTADO: EXCLUIDO")
+
+    print("\n--- FIN DEL PROCESO DE FILTRADO ---")
+    print(f"Se incluyeron {len(filtered_results)} resultados después de filtrar.")
+    print("="*50 + "\n")
+
+    if not filtered_results:
+        return {"query": q, "message": "No se encontraron resultados que coincidan con tus filtros."}
+        
+    return {"query": q, "results": filtered_results}
