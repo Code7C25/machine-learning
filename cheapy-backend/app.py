@@ -1,54 +1,45 @@
 import subprocess
 import json
+import threading
 from fastapi import FastAPI, HTTPException
 from typing import Optional
 import re
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Cheapy Scraper API - Mercado Libre Only")
+app = FastAPI(title="Cheapy Scraper API")
 
-# La ruta completa y explícita a tu ejecutable de scrapy.exe.
+# --- Configuración de CORS (ya la tenías, la mantenemos) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"],
+)
+
 SCRAPY_PATH = r"C:\Users\Usuario\AppData\Local\Programs\Python\Python313\Scripts\scrapy.exe"
 
-
+# --- NUEVA FUNCIÓN AUXILIAR PARA LIMPIAR PRECIOS ---
 def clean_price(price_str: str) -> Optional[float]:
-    """Convierte un string de precio a un número flotante."""
-    if not isinstance(price_str, str):
-        return None
+    if not isinstance(price_str, str): return None
     try:
-        cleaned_str = re.sub(r'[^\d,]', '', price_str).replace(',', '.')
+        # Lógica de limpieza mejorada
+        cleaned_str = re.sub(r'[^\d,.]', '', price_str)
+        if ',' in cleaned_str and '.' in cleaned_str:
+             cleaned_str = cleaned_str.replace('.', '').replace(',', '.')
+        else:
+             cleaned_str = cleaned_str.replace(',', '.')
         return float(cleaned_str)
     except (ValueError, TypeError):
         print(f"ADVERTENCIA: No se pudo convertir el precio '{price_str}' a número.")
         return None
 
-
-@app.get("/buscar")
-def buscar_producto(
-    q: str,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None,
-    min_reliability: Optional[int] = None
-):
-    """
-    Ejecuta el spider de Mercado Libre y filtra los resultados.
-    """
-    if not q:
-        raise HTTPException(status_code=400, detail="El parámetro 'q' es requerido.")
-
-    print("\n" + "="*50)
-    print(f"NUEVA BÚSQUEDA (SOLO ML): '{q}'")
-    print(f"Filtros recibidos: min_price={min_price}, max_price={max_price}, min_reliability={min_reliability}")
-    print("="*50)
-
-    # --- Ejecutamos SOLAMENTE el spider de Mercado Libre ---
+# La función run_spider se queda exactamente igual
+def run_spider(spider_name: str, query: str, results_list: list):
     command = [
-        SCRAPY_PATH, "crawl", "mercadolibre",
-        "-a", f"query={q}",
+        SCRAPY_PATH, "crawl", spider_name,
+        "-a", f"query={query}",
         "-o", "-:jsonlines",
         "--nolog"
     ]
-    
-    all_results = []
     try:
         result = subprocess.run(
             command, capture_output=True, text=True, check=True,
@@ -56,16 +47,50 @@ def buscar_producto(
         )
         for line in result.stdout.strip().split('\n'):
             if line:
-                all_results.append(json.loads(line))
+                results_list.append(json.loads(line))
     except Exception as e:
-        print(f"Error crítico al ejecutar el subproceso de Scrapy: {e}")
-        # Devolvemos un error claro si Scrapy falla
-        raise HTTPException(status_code=500, detail="El proceso de scraping falló.")
-    
-    print(f"\nSe encontraron {len(all_results)} resultados de ML antes de filtrar.")
-    print("--- INICIANDO PROCESO DE FILTRADO ---")
+        print(f"Error con el spider '{spider_name}': {e}")
 
-    # --- Lógica de Filtrado (la misma que teníamos, con logging) ---
+
+# --- ENDPOINT MODIFICADO PARA ACEPTAR Y APLICAR FILTROS ---
+@app.get("/buscar")
+def buscar_producto(
+    q: str,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    min_reliability: Optional[int] = None
+):
+    print("\n" + "="*50)
+    print(f"NUEVA BÚSQUEDA: '{q}'")
+    print(f"Filtros recibidos: min_price={min_price}, max_price={max_price}, min_reliability={min_reliability}")
+    print("="*50)
+    
+    all_results_with_duplicates = []
+    
+    ebay_thread = threading.Thread(target=run_spider, args=("ebay", q, all_results_with_duplicates))
+    ml_thread = threading.Thread(target=run_spider, args=("mercadolibre", q, all_results_with_duplicates))
+    
+    ebay_thread.start()
+    ml_thread.start()
+    
+    ebay_thread.join(timeout=30.0)
+    ml_thread.join(timeout=30.0)
+
+    # --- ¡NUEVO PASO DE LIMPIEZA Y DEDUPLICACIÓN! ---
+    print(f"\nSe encontraron {len(all_results_with_duplicates)} resultados en total (con posibles duplicados).")
+    
+    seen_urls = set()
+    all_results = []
+    for item in all_results_with_duplicates:
+        url = item.get('url')
+        if url and url not in seen_urls:
+            seen_urls.add(url)
+            all_results.append(item)
+    
+    print(f"Se encontraron {len(all_results)} resultados ÚNICOS antes de filtrar.")
+    print("--- INICIANDO PROCESO DE FILTRADO ---")
+    
+    # El resto de la lógica de filtrado ahora usa la lista limpia `all_results`
     filtered_results = []
     for i, item in enumerate(all_results):
         print(f"\n[Item {i+1}] Procesando: {item.get('title', 'SIN TITULO')}")
