@@ -12,30 +12,19 @@
             <img src="icons/icon.png" alt="Cheapy Logo" class="logo">
             <h1>Cheapy</h1>
         </div>
-        <p class="description">Resultados para tu última búsqueda:</p>
-
-        <!-- === NUEVA SECCIÓN DE FILTROS === -->
-        <div class="filters-container">
-            <div class="filter-group">
-                <label for="min-price">Precio Mínimo</label>
-                <input type="number" id="min-price" placeholder="Ej: 5000">
-            </div>
-            <div class="filter-group">
-                <label for="max-price">Precio Máximo</label>
-                <input type="number" id="max-price" placeholder="Ej: 50000">
-            </div>
-            <div class="filter-group">
-                <label for="reliability">Confianza Mínima: <span id="reliability-value">3</span>/5</label>
-                <input type="range" id="reliability" min="1" max="5" value="3" class="slider">
-            </div>
-            <button id="filter-button">Filtrar</button>
-        </div>
-        <!-- === FIN DE LA SECCIÓN DE FILTROS === -->
+        <p class="description">Recomendaciones para tu búsqueda:</p>
 
         <div id="results-container">
-            <p id="status-text">Realiza una búsqueda en Google para ver los enlaces.</p>
-            <ul id="links-list"></ul>
+            <p id="status-text">Buscando las mejores ofertas...</p>
+            <ul id="links-list">
+                <!-- Los resultados se insertarán aquí -->
+            </ul>
         </div>
+        
+        <!-- Botón para ver todos los resultados -->
+        <button id="show-all-button" class="show-all-btn" style="display: none;">
+            Ver todos los resultados
+        </button>
     </div>
     <script src="popup.js"></script>
 </body>

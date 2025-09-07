@@ -1,100 +1,119 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- 1. Referencias a los Elementos del HTML ---
+    // Referencias a los elementos del HTML
     const statusText = document.getElementById('status-text');
     const linksList = document.getElementById('links-list');
     const description = document.querySelector('.description');
-    
-    // Referencias a los filtros
-    const minPriceInput = document.getElementById('min-price');
-    const maxPriceInput = document.getElementById('max-price');
-    const reliabilitySlider = document.getElementById('reliability');
-    const reliabilityValueSpan = document.getElementById('reliability-value');
-    const filterButton = document.getElementById('filter-button');
+    const showAllButton = document.getElementById('show-all-button');
 
-    // --- 2. Lógica de la Interfaz ---
-    // Actualiza el número de la confianza mientras se mueve el slider
-    reliabilitySlider.addEventListener('input', () => {
-        reliabilityValueSpan.textContent = reliabilitySlider.value;
-    });
+    // Variable global para guardar todos los resultados
+    let allResults = [];
 
-    // La función principal que se conecta al backend
     const performSearch = () => {
         chrome.storage.local.get(['lastSearchQuery'], result => {
             const query = result.lastSearchQuery;
-
             if (!query) {
-                statusText.textContent = "Primero, busca algo en Google.";
+                statusText.textContent = "Busca algo en Google para empezar.";
                 return;
             }
 
-            // Preparamos la UI para la búsqueda
-            description.textContent = `Resultados para: "${query}"`;
-            statusText.textContent = 'Buscando y filtrando...';
-            statusText.style.display = 'block';
-            linksList.innerHTML = ''; // Limpiamos resultados anteriores
+            description.textContent = `Recomendaciones para: "${query}"`;
+            statusText.textContent = 'Analizando las mejores ofertas...';
             
-            // --- 3. Leer Filtros y Construir la URL ---
-            const minPrice = minPriceInput.value;
-            const maxPrice = maxPriceInput.value;
-            const minReliability = reliabilitySlider.value;
+            const apiUrl = `http://127.0.0.1:8000/buscar?q=${encodeURIComponent(query)}`;
             
-            let apiUrl = `http://127.0.0.1:8000/buscar?q=${encodeURIComponent(query)}`;
-            
-            if (minPrice) apiUrl += `&min_price=${minPrice}`;
-            if (maxPrice) apiUrl += `&max_price=${maxPrice}`;
-            // Solo enviamos el filtro de confiabilidad si no es el mínimo (1)
-            if (minReliability > 1) apiUrl += `&min_reliability=${minReliability}`;
-            
-            // --- 4. Llamada a la API con fetch ---
             fetch(apiUrl)
-                .then(response => {
-                    if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    statusText.style.display = 'none'; // Ocultamos el "cargando..."
+                    statusText.style.display = 'none';
                     
                     if (data.results && data.results.length > 0) {
-                        displayResults(data.results);
+                        allResults = data.results; // Guardamos todos los resultados
+                        displayRecommendations(); // Mostramos solo las recomendaciones
+                        showAllButton.style.display = 'block'; // Mostramos el botón
                     } else {
                         statusText.style.display = 'block';
                         statusText.textContent = data.message || "No se encontraron resultados.";
                     }
                 })
                 .catch(err => {
-                    console.error("Error al conectar con el backend:", err);
+                    console.error(err);
                     statusText.style.display = 'block';
-                    statusText.textContent = "Error al conectar con el backend. ¿Está encendido?";
+                    statusText.textContent = "Error al conectar con el backend.";
                 });
         });
     };
 
-    // --- 5. Función Auxiliar para Mostrar Resultados ---
-    const displayResults = (results) => {
-        linksList.innerHTML = "";
+    // Función para crear una tarjeta de resultado
+    const createResultCard = (item, categoryInfo = {}) => {
+        const li = document.createElement('li');
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        
+        const a = document.createElement('a');
+        a.href = item.url;
+        a.target = '_blank';
 
-        results.forEach(item => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            
-            a.href = item.url;
-            
-            // --- LÍNEA MODIFICADA PARA MOSTRAR EL NÚMERO DE RESEÑAS/VENTAS ---
-            const stars = '⭐'.repeat(item.reliability_score).padEnd(5, '☆');
-            const reviewsText = item.reviews_count > 0 ? `(${item.reviews_count} reseñas)` : '';
-            
-            a.textContent = `${item.title} — ${item.price} [${item.source}] | Confianza: ${stars} ${reviewsText}`;
-            a.target = '_blank';
-            
-            li.appendChild(a);
-            linksList.appendChild(li);
-        });
+        const stars = '⭐'.repeat(item.reliability_score || 0).padEnd(5, '☆');
+        const reviewsText = item.reviews_count > 0 ? `(${item.reviews_count} reseñas)` : '';
+        
+        let categoryHTML = '';
+        if (categoryInfo.title) {
+            categoryHTML = `<span class="category-title ${categoryInfo.className || ''}">${categoryInfo.title}</span>`;
+        }
+
+        a.innerHTML = `
+            ${categoryHTML}
+            <span class="item-title">${item.title}</span>
+            <span class="item-details">${item.price} | Confianza: ${stars} ${reviewsText}</span>
+        `;
+        
+        card.appendChild(a);
+        li.appendChild(card);
+        return li;
     };
 
-    // --- 6. Event Listeners ---
-    // El botón "Buscar y Filtrar" ahora es el que inicia todo
-    filterButton.addEventListener('click', performSearch);
+    // Función para mostrar solo las 2 recomendaciones
+    const displayRecommendations = () => {
+        linksList.innerHTML = "";
+
+        // Lógica para encontrar los "ganadores" aquí en el frontend
+        const masBarato = [...allResults].sort((a, b) => a.price_numeric - b.price_numeric)[0];
+        
+        const confiables = allResults.filter(p => p.reviews_count > 20 && p.reliability_score >= 4);
+        let mejorCalidadPrecio = null;
+        if (confiables.length > 0) {
+            mejorCalidadPrecio = confiables.sort((a, b) => a.price_numeric - b.price_numeric)[0];
+        } else {
+            mejorCalidadPrecio = [...allResults].sort((a, b) => b.reviews_count - a.reviews_count)[0];
+        }
+
+        linksList.appendChild(createResultCard(masBarato, { title: "🔥 Más Barato" }));
+
+        // Solo mostrar el segundo si es un producto diferente
+        if (mejorCalidadPrecio && mejorCalidadPrecio.url !== masBarato.url) {
+            linksList.appendChild(createResultCard(mejorCalidadPrecio, { title: "💎 Mejor Calidad-Precio", className: 'best-value' }));
+        }
+    };
     
-    // También, realizamos una búsqueda inicial con filtros por defecto cuando se abre el popup
+    // Función para mostrar TODOS los resultados
+    const displayAllResults = () => {
+        linksList.innerHTML = "";
+        allResults.forEach(item => {
+            linksList.appendChild(createResultCard(item));
+        });
+        showAllButton.textContent = "Mostrar solo recomendaciones";
+    };
+
+    // Event listener para el botón
+    showAllButton.addEventListener('click', () => {
+        if (showAllButton.textContent.includes("Ver todos")) {
+            displayAllResults();
+        } else {
+            displayRecommendations();
+            showAllButton.textContent = "Ver todos los resultados";
+        }
+    });
+
+    // Iniciar la búsqueda
     performSearch();
 });

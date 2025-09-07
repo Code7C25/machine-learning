@@ -3,7 +3,7 @@ body {
     background-color: #f0f2f5;
     margin: 0;
     padding: 15px;
-    width: 320px;
+    width: 350px; /* Un poco más ancho para los resultados */
 }
 
 .container {
@@ -11,7 +11,6 @@ body {
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    text-align: center;
 }
 
 .header {
@@ -37,83 +36,88 @@ h1 {
     font-size: 14px;
     color: #606770;
     margin-bottom: 20px;
+    text-align: center;
 }
 
 #links-list {
     list-style-type: none;
     padding: 0;
-    margin-top: 15px;
+    margin: 0;
 }
 
 #links-list li {
     margin-bottom: 12px;
 }
 
-#links-list a {
-    display: block;
-    padding: 10px;
-    background-color: #fff8e1;
-    border: 1px solid #f0c14b;
-    color: #111;
-    text-decoration: none;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
+/* Estilos para las nuevas tarjetas de resultado */
+.result-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: left;
+    transition: box-shadow 0.2s;
+    overflow: hidden; /* Para que el enlace ocupe toda la tarjeta */
 }
 
-#links-list a:hover {
-    background-color: #1877f2;
-    color: #ffffff;
+.result-card a {
+    text-decoration: none;
+    color: #111;
+    display: block;
+    padding: 12px;
+}
+
+.result-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+    border-color: #007bff;
+}
+
+.category-title {
+    font-size: 11px;
+    margin: 0 0 8px 0;
+    color: #fff;
+    background-color: #007bff;
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.category-title.best-value {
+    background-color: #28a745;
+}
+
+.item-title {
+    font-size: 13px;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 6px;
+}
+
+.item-details {
+    font-size: 12px;
+    color: #606770;
+    display: block;
 }
 
 #status-text {
     color: #606770;
+    text-align: center;
 }
 
-.filters-container {
-    background-color: #f7f7f7;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 15px;
-    margin-bottom: 20px;
-}
-
-.filter-group {
-    margin-bottom: 10px;
-    text-align: left;
-}
-
-.filter-group label {
-    display: block;
-    font-size: 13px;
-    font-weight: 500;
-    color: #333;
-    margin-bottom: 5px;
-}
-
-.filter-group input[type="number"] {
-    width: 95%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-.slider {
-    width: 100%;
-}
-
-#filter-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 10px 15px;
+/* Estilo para el botón "Ver todos" */
+.show-all-btn {
+    background: none;
+    border: 1px solid #007bff;
+    color: #007bff;
+    padding: 8px 12px;
     border-radius: 5px;
     cursor: pointer;
     font-weight: bold;
     width: 100%;
-    margin-top: 10px;
+    margin-top: 15px;
 }
 
-#filter-button:hover {
-    background-color: #0056b3;
+.show-all-btn:hover {
+    background-color: #007bff;
+    color: white;
 }
