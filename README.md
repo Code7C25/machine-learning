@@ -31,7 +31,7 @@ Actualmente permite obtener resultados de **Mercado Libre**, mostrando precios y
 ### 1. Clonar el repositorio
 
 ```bash
-git clone <URL-del-repo>
+git clone https://github.com/Code7C25/machine-learning
 cd cheapy
 ```
 
@@ -75,8 +75,4 @@ Actualmente el proyecto se encuentra en **fase de desarrollo funcional**, con in
 ## 🤝 Contribuciones
 
 Este es un proyecto personal para fines académicos, pero cualquier sugerencia o mejora es bienvenida.
-
----
-
-👉 ¿Querés que también te arme una **versión con badges** (ej. Python, FastAPI, estado del proyecto, licencia) para que se vea más atractivo en GitHub?
 
