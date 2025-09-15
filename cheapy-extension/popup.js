@@ -1,3 +1,6 @@
+// Variable global para los resultados
+let allResults = [];
+
 document.addEventListener('DOMContentLoaded', () => {
     const statusText = document.getElementById('status-text');
     const linksList = document.getElementById('links-list');
@@ -5,8 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const showAllButton = document.getElementById('show-all-button');
     const sortContainer = document.getElementById('sort-container');
     const sortSelect = document.getElementById('sort-select');
-
-    let allResults = [];
 
     const getNumericPrice = (priceStr) => {
         if (!priceStr || typeof priceStr !== 'string') return null;
@@ -82,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // (El resto de las funciones: createResultCard, displayRecommendations, displayAllResults y los Event Listeners se quedan exactamente igual)
     const createResultCard = (item, categoryInfo = {}) => {
         const li = document.createElement('li');
         const a = document.createElement('a');
@@ -110,69 +110,62 @@ document.addEventListener('DOMContentLoaded', () => {
         li.appendChild(a);
         return li;
     };
-    
-    const displayRecommendations = () => { /* ... sin cambios ... */ };
-    const displayAllResults = () => { /* ... sin cambios ... */ };
-    showAllButton.addEventListener('click', () => { /* ... sin cambios ... */ });
+
+    const displayRecommendations = () => {
+        linksList.innerHTML = "";
+        description.textContent = "Recomendaciones para tu búsqueda:";
+        sortContainer.style.display = 'none';
+        showAllButton.textContent = "Ver todos los resultados";
+
+        if (allResults.length === 0) return;
+
+        const sortedByPrice = [...allResults].sort((a, b) => a.price_numeric - b.price_numeric);
+        const masBarato = sortedByPrice[0];
+        const confiables = allResults.filter(p => p.reviews_count > 20 && p.reliability_score >= 4);
+        
+        let mejorCalidadPrecio = null;
+        if (confiables.length > 0) {
+            mejorCalidadPrecio = confiables.sort((a, b) => a.price_numeric - b.price_numeric)[0];
+        } else {
+            mejorCalidadPrecio = [...allResults].sort((a, b) => b.reviews_count - a.reviews_count)[0];
+        }
+
+        linksList.appendChild(createResultCard(masBarato, { title: "🔥 Más Barato" }));
+        if (mejorCalidadPrecio && mejorCalidadPrecio.url !== masBarato.url) {
+            linksList.appendChild(createResultCard(mejorCalidadPrecio, { title: "💎 Mejor Calidad-Precio", className: 'best-value' }));
+        }
+    };
+
+    const displayAllResults = () => {
+        linksList.innerHTML = "";
+        description.textContent = "Todos los resultados:";
+        sortContainer.style.display = 'flex';
+        showAllButton.textContent = "Mostrar solo recomendaciones";
+        
+        const sortBy = sortSelect.value;
+        let sortedList = [...allResults]; 
+
+        if (sortBy === 'price_asc') sortedList.sort((a, b) => a.price_numeric - b.price_numeric);
+        else if (sortBy === 'price_desc') sortedList.sort((a, b) => b.price_numeric - a.price_numeric);
+        else if (sortBy === 'reviews_desc') sortedList.sort((a, b) => b.reviews_count - a.reviews_count);
+
+        sortedList.forEach(item => {
+            linksList.appendChild(createResultCard(item));
+        });
+    };
+
+    // Event listeners
+    showAllButton.addEventListener('click', () => {
+        if (showAllButton.textContent.includes("Ver todos")) {
+            displayAllResults();
+        } else {
+            displayRecommendations();
+            showAllButton.textContent = "Ver todos los resultados";
+        }
+    });
+
     sortSelect.addEventListener('change', displayAllResults);
 
+    // Iniciar la búsqueda
     performSearch();
 });
-
-// Para evitar duplicar código, aquí están las funciones que no cambiaron
-function displayRecommendations() {
-    const linksList = document.getElementById('links-list');
-    const description = document.querySelector('.description');
-    const sortContainer = document.getElementById('sort-container');
-    const showAllButton = document.getElementById('show-all-button');
-    const allResults = window.allResults || [];
-
-    linksList.innerHTML = "";
-    description.textContent = "Recomendaciones para tu búsqueda:";
-    sortContainer.style.display = 'none';
-    showAllButton.textContent = "Ver todos los resultados";
-
-    if (allResults.length === 0) return;
-
-    const sortedByPrice = [...allResults].sort((a, b) => a.price_numeric - b.price_numeric);
-    const masBarato = sortedByPrice[0];
-    const confiables = allResults.filter(p => p.reviews_count > 20 && p.reliability_score >= 4);
-    
-    let mejorCalidadPrecio = null;
-    if (confiables.length > 0) {
-        mejorCalidadPrecio = confiables.sort((a, b) => a.price_numeric - b.price_numeric)[0];
-    } else {
-        mejorCalidadPrecio = [...allResults].sort((a, b) => b.reviews_count - a.reviews_count)[0];
-    }
-
-    linksList.appendChild(createResultCard(masBarato, { title: "🔥 Más Barato" }));
-    if (mejorCalidadPrecio && mejorCalidadPrecio.url !== masBarato.url) {
-        linksList.appendChild(createResultCard(mejorCalidadPrecio, { title: "💎 Mejor Calidad-Precio", className: 'best-value' }));
-    }
-}
-
-function displayAllResults() {
-    const linksList = document.getElementById('links-list');
-    const description = document.querySelector('.description');
-    const sortContainer = document.getElementById('sort-container');
-    const showAllButton = document.getElementById('show-all-button');
-    const sortSelect = document.getElementById('sort-select');
-    const allResults = window.allResults || [];
-
-    linksList.innerHTML = "";
-    description.textContent = "Todos los resultados:";
-    sortContainer.style.display = 'flex';
-    showAllButton.textContent = "Mostrar solo recomendaciones";
-    
-    const sortBy = sortSelect.value;
-    let sortedList = [...allResults]; 
-
-    if (sortBy === 'price_asc') sortedList.sort((a, b) => a.price_numeric - b.price_numeric);
-    else if (sortBy === 'price_desc') sortedList.sort((a, b) => b.price_numeric - a.price_numeric);
-    else if (sortBy === 'reviews_desc') sortedList.sort((a, b) => b.reviews_count - a.reviews_count);
-
-    sortedList.forEach(item => {
-        linksList.appendChild(createResultCard(item));
-    });
-}
-window.allResults = []; // Hacemos la variable global para que sea accesible
