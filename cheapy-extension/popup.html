@@ -14,6 +14,18 @@
         </div>
         <p class="description">Recomendaciones para tu búsqueda:</p>
 
+        <!-- === SECCIÓN DE ORDENAMIENTO MOVIDA AQUÍ ARRIBA === -->
+        <div id="sort-container" class="sort-container" style="display: none;">
+            <label for="sort-select">Ordenar por:</label>
+            <select id="sort-select">
+                <option value="relevance">Relevancia</option>
+                <option value="price_asc">Menor Precio</option>
+                <option value="price_desc">Mayor Precio</option>
+                <option value="reviews_desc">Más Reseñas</option>
+            </select>
+        </div>
+        <!-- === FIN DE LA SECCIÓN DE ORDENAMIENTO === -->
+
         <div id="results-container">
             <p id="status-text">Buscando las mejores ofertas...</p>
             <ul id="links-list">
@@ -21,7 +33,6 @@
             </ul>
         </div>
         
-        <!-- Botón para ver todos los resultados -->
         <button id="show-all-button" class="show-all-btn" style="display: none;">
             Ver todos los resultados
         </button>

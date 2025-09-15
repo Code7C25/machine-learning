@@ -1,123 +1,60 @@
+/* --- Estilos Generales --- */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f0f2f5;
     margin: 0;
     padding: 15px;
-    width: 350px; /* Un poco más ancho para los resultados */
+    width: 350px;
 }
+.container { background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+.header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
+.logo { width: 32px; height: 32px; margin-right: 10px; }
+h1 { font-size: 24px; color: #1c1e21; margin: 0; }
+.description { font-size: 14px; color: #606770; margin-bottom: 20px; text-align: center; }
+#status-text { color: #606770; text-align: center; }
 
-.container {
-    background-color: #ffffff;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
+/* --- Select de Orden --- */
+.sort-container { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+.sort-container label { font-size: 13px; font-weight: 500; color: #333; }
+.sort-container select { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }
 
-.header {
+/* --- Lista de Resultados --- */
+#links-list { list-style-type: none; padding: 0; margin: 0; }
+#links-list li { margin-bottom: 10px; }
+
+/* --- ESTILOS DE TARJETA CORREGIDOS --- */
+/* El enlace <a> es ahora el contenedor flex con los estilos */
+.result-card-link {
     display: flex;
     align-items: center;
-    justify-content: center;
-    margin-bottom: 15px;
-}
-
-.logo {
-    width: 32px;
-    height: 32px;
-    margin-right: 10px;
-}
-
-h1 {
-    font-size: 24px;
-    color: #1c1e21;
-    margin: 0;
-}
-
-.description {
-    font-size: 14px;
-    color: #606770;
-    margin-bottom: 20px;
-    text-align: center;
-}
-
-#links-list {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-}
-
-#links-list li {
-    margin-bottom: 12px;
-}
-
-/* Estilos para las nuevas tarjetas de resultado */
-.result-card {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    text-align: left;
-    transition: box-shadow 0.2s;
-    overflow: hidden; /* Para que el enlace ocupe toda la tarjeta */
-}
-
-.result-card a {
     text-decoration: none;
     color: #111;
-    display: block;
-    padding: 12px;
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    transition: box-shadow 0.2s, border-color 0.2s;
 }
-
-.result-card:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+.result-card-link:hover {
     border-color: #007bff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+/* --- FIN DE ESTILOS DE TARJETA CORREGIDOS --- */
+#results-container {
+    max-height: 400px;
+    overflow-y: auto;
+    /* Truco de diseño para el scrollbar */
+    padding-right: 10px;
+    margin-right: -10px;
 }
 
-.category-title {
-    font-size: 11px;
-    margin: 0 0 8px 0;
-    color: #fff;
-    background-color: #007bff;
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-weight: bold;
-    text-transform: uppercase;
-}
+.product-image { width: 60px; height: 60px; min-width: 60px; object-fit: contain; margin-right: 12px; border-radius: 4px; background-color: #f0f0f0; }
+.text-content { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.category-title { font-size: 10px; color: #fff; background-color: #007bff; display: inline-block; padding: 2px 8px; border-radius: 10px; font-weight: bold; text-transform: uppercase; align-self: flex-start; }
+.category-title.best-value { background-color: #28a745; }
+.item-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-details { font-size: 12px; color: #606770; }
 
-.category-title.best-value {
-    background-color: #28a745;
-}
-
-.item-title {
-    font-size: 13px;
-    font-weight: 500;
-    display: block;
-    margin-bottom: 6px;
-}
-
-.item-details {
-    font-size: 12px;
-    color: #606770;
-    display: block;
-}
-
-#status-text {
-    color: #606770;
-    text-align: center;
-}
-
-/* Estilo para el botón "Ver todos" */
-.show-all-btn {
-    background: none;
-    border: 1px solid #007bff;
-    color: #007bff;
-    padding: 8px 12px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: bold;
-    width: 100%;
-    margin-top: 15px;
-}
-
-.show-all-btn:hover {
-    background-color: #007bff;
-    color: white;
-}
+/* --- Botón "Ver todos" --- */
+.show-all-btn { background: none; border: 1px solid #007bff; color: #007bff; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 15px; }
+.show-all-btn:hover { background-color: #007bff; color: white; }

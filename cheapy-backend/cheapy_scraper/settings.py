@@ -38,3 +38,16 @@ DOWNLOADER_MIDDLEWARES = {
 DOWNLOAD_DELAY = 1 # 1 segundo de espera entre peticiones
 
 # --- FIN CONFIGURACIÓN ANTI-BLOQUEO ---
+# settings.py
+
+# ... tus configs ...
+USER_AGENT = '...'
+ROBOTSTXT_OBEY = False
+DOWNLOAD_DELAY = 1
+
+# --- DESACTIVAR PLAYWRIGHT TEMPORALMENTE ---
+# DOWNLOAD_HANDLERS = {
+#     "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+#     "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+# }
+# TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
