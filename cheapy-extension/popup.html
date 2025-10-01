@@ -2,40 +2,42 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cheapy</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
+            <!-- Asumiendo que icon48.png está en una carpeta 'icons' -->
             <img src="icons/icon.png" alt="Cheapy Logo" class="logo">
-            <h1>Cheapy</h1>
-        </div>
-        <p class="description">Recomendaciones para tu búsqueda:</p>
-
-        <!-- === SECCIÓN DE ORDENAMIENTO MOVIDA AQUÍ ARRIBA === -->
-        <div id="sort-container" class="sort-container" style="display: none;">
-            <label for="sort-select">Ordenar por:</label>
-            <select id="sort-select">
-                <option value="relevance">Relevancia</option>
-                <option value="price_asc">Menor Precio</option>
-                <option value="price_desc">Mayor Precio</option>
-                <option value="reviews_desc">Más Reseñas</option>
-            </select>
-        </div>
-        <!-- === FIN DE LA SECCIÓN DE ORDENAMIENTO === -->
-
-        <div id="results-container">
-            <p id="status-text">Buscando las mejores ofertas...</p>
-            <ul id="links-list">
-                <!-- Los resultados se insertarán aquí -->
-            </ul>
+            <!-- ID REQUERIDO -->
+            <h1 id="query-title">Cheapy</h1> 
         </div>
         
-        <button id="show-all-button" class="show-all-btn" style="display: none;">
-            Ver todos los resultados
-        </button>
+        <!-- ID REQUERIDO -->
+        <div id="status-message">Cargando...</div>
+
+        <!-- ID REQUERIDO -->
+        <div id="recommendations" class="results-section">
+            <!-- Las tarjetas de recomendación se insertarán aquí -->
+        </div>
+
+        <!-- ID REQUERIDO -->
+        <button id="show-all-button" class="show-all-btn" style="display: none;">Ver todos los resultados</button>
+        
+        <!-- ID REQUERIDO -->
+        <select id="sort-select" style="display: none;">
+            <option value="relevance">Ordenar por: Relevancia</option>
+            <option value="price_asc">Precio: más bajo primero</option>
+            <option value="price_desc">Precio: más alto primero</option>
+            <option value="reviews">Más reseñas</option>
+        </select>
+        
+        <!-- ID REQUERIDO -->
+        <ul id="results-container">
+            <!-- Las tarjetas de resultados se insertarán aquí -->
+        </ul>
+
+        <button id="back-to-recommendations-button" class="show-all-btn" style="display: none;">← Volver a recomendaciones</button>
     </div>
     <script src="popup.js"></script>
 </body>
