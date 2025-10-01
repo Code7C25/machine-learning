@@ -1,60 +1,207 @@
 /* --- Estilos Generales --- */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: #f0f2f5;
     margin: 0;
-    padding: 15px;
-    width: 350px;
+    width: 380px; /* Un poco más de espacio para que no se vea apretado */
 }
-.container { background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-.header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
-.logo { width: 32px; height: 32px; margin-right: 10px; }
-h1 { font-size: 24px; color: #1c1e21; margin: 0; }
-.description { font-size: 14px; color: #606770; margin-bottom: 20px; text-align: center; }
-#status-text { color: #606770; text-align: center; }
+
+.container {
+    background-color: #ffffff;
+    padding: 16px;
+}
+
+/* --- Cabecera --- */
+.header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.logo {
+    width: 32px;
+    height: 32px;
+    margin-right: 12px;
+}
+
+#query-title { /* Antes era 'h1' */
+    font-size: 20px;
+    color: #1c1e21;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- Mensajes de Estado --- */
+#status-message {
+    color: #606770;
+    text-align: center;
+    padding: 20px 0;
+    font-size: 14px;
+}
 
 /* --- Select de Orden --- */
-.sort-container { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-.sort-container label { font-size: 13px; font-weight: 500; color: #333; }
-.sort-container select { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }
+#sort-select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #fff;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
 
-/* --- Lista de Resultados --- */
-#links-list { list-style-type: none; padding: 0; margin: 0; }
-#links-list li { margin-bottom: 10px; }
+/* --- Lista de Resultados (Contenedor con Scroll) --- */
+#results-container {
+    list-style-type: none;
+    background-color: #f0f2f5;      /* Mantenemos el fondo gris */
+    border-top: 1px solid #e0e0e0;
+    
+    /* --- CAMBIOS CLAVE AQUÍ --- */
+    height: 360px;                  /* 1. Altura FIJA de 400px */
+    overflow-y: auto;               /* 2. Scrollbar vertical cuando sea necesario */
+    margin: 0;                      /* 3. Eliminamos los márgenes negativos */
+    padding: 10px 16px;             /* 4. Padding interno simple */
+    border-radius: 6px;             /* 5. (Opcional) Bordes redondeados para que se vea mejor */
+    margin-bottom: 16px;            /* 6. Espacio para separarlo del botón de abajo */
+}
 
-/* --- ESTILOS DE TARJETA CORREGIDOS --- */
-/* El enlace <a> es ahora el contenedor flex con los estilos */
+/* --- Estilos de la Tarjeta de Producto --- */
+.result-card {
+    margin-bottom: 10px;
+}
+
 .result-card-link {
     display: flex;
     align-items: center;
     text-decoration: none;
     color: #111;
-    padding: 10px;
+    padding: 12px;
     background-color: #fff;
     border: 1px solid #ddd;
     border-radius: 8px;
-    transition: box-shadow 0.2s, border-color 0.2s;
-}
-.result-card-link:hover {
-    border-color: #007bff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-}
-/* --- FIN DE ESTILOS DE TARJETA CORREGIDOS --- */
-#results-container {
-    max-height: 400px;
-    overflow-y: auto;
-    /* Truco de diseño para el scrollbar */
-    padding-right: 10px;
-    margin-right: -10px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.product-image { width: 60px; height: 60px; min-width: 60px; object-fit: contain; margin-right: 12px; border-radius: 4px; background-color: #f0f0f0; }
-.text-content { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
-.category-title { font-size: 10px; color: #fff; background-color: #007bff; display: inline-block; padding: 2px 8px; border-radius: 10px; font-weight: bold; text-transform: uppercase; align-self: flex-start; }
-.category-title.best-value { background-color: #28a745; }
-.item-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-details { font-size: 12px; color: #606770; }
+.result-card-link:hover {
+    border-color: #0d6efd; /* Un azul más moderno */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.result-image { /* Antes 'product-image' */
+    width: 70px;
+    height: 70px;
+    min-width: 70px;
+    object-fit: contain;
+    margin-right: 15px;
+    border-radius: 6px;
+    background-color: #f7f7f7;
+}
+
+.result-text-content { /* Antes 'text-content' */
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    overflow: hidden; /* Importante para que el ellipsis funcione */
+    width: 100%;
+}
+
+.item-title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    /* Para títulos largos que ocupan dos líneas */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;  
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.item-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.item-price {
+    font-weight: bold;
+    color: #212529;
+    font-size: 16px;
+}
+
+.item-reviews {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+/* --- Insignias y Etiquetas --- */
+.category-badge {
+    font-size: 10px;
+    color: #fff;
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    align-self: flex-start;
+    margin-bottom: 4px;
+}
+
+.category-badge.cheapest { /* Clase específica de JS */
+    background-color: #0d6efd;
+}
+
+.category-badge.best-value { /* Clase específica de JS */
+    background-color: #198754;
+}
+
+.store-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: #495057;
+    background-color: #e9ecef;
+    padding: 3px 7px;
+    border-radius: 4px;
+}
 
 /* --- Botón "Ver todos" --- */
-.show-all-btn { background: none; border: 1px solid #007bff; color: #007bff; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 15px; }
-.show-all-btn:hover { background-color: #007bff; color: white; }
+.show-all-btn {
+    background-color: #fff;
+    border: 1px solid #0d6efd;
+    color: #0d6efd;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    
+    /* Nuevos márgenes para separar arriba y abajo */
+    margin-top: 16px; 
+    margin-bottom: 16px;
+
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.show-all-btn:hover {
+    background-color: #0d6efd;
+    color: white;
+}
+.back-btn {
+    background: none;
+    border: none;
+    color: #0d6efd;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 0;
+    margin-bottom: 10px;
+}
+
+.back-btn:hover {
+    text-decoration: underline;
+}
