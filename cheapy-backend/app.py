@@ -1,77 +1,95 @@
-# cheapy-backend/app.py
-
 import subprocess
 import json
-import threading
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-# El import 're' y la función 'clean_price' ya no son necesarios aquí.
 
+# --- 1. Configuración de la Aplicación y Constantes ---
 app = FastAPI(title="Cheapy Scraper API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
-)
-
+BASE_DIR = Path(__file__).resolve().parent
 SCRAPY_PATH = r"C:\Users\Usuario\AppData\Local\Programs\Python\Python313\Scripts\scrapy.exe"
 
-def run_spider(spider_name: str, query: str, results_list: list):
-    command = [
-        SCRAPY_PATH, "crawl", spider_name,
-        "-a", f"query={query}",
-        "-o", "-:jsonlines"
-    ]
-    try:
-        result = subprocess.run(
-            command, capture_output=True, text=True, check=True,
-            encoding="latin-1", errors="ignore",
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
-        for line in result.stdout.splitlines():
-            s = line.strip()
-            if s.startswith("{") and s.endswith("}"):
-                try:
-                    # Los datos que llegan aquí ya están limpios gracias a la pipeline
-                    results_list.append(json.loads(s))
-                except json.JSONDecodeError as e:
-                    print(f"[APP] ⚠️ Línea JSON inválida ignorada: {e}")
-    except Exception as e:
-        print(f"[APP] ❌ Error ejecutando spider '{spider_name}': {e}")
+# --- 2. Middleware de CORS ---
+# Permite que la extensión se comunique con el servidor.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Para producción, se recomienda restringir esto al ID de tu extensión.
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-
+# --- 3. Endpoint Principal de la API ---
 @app.get("/buscar")
-def buscar_producto(q: str):
+def buscar_producto(q: str, country: str = "AR"):
+    """
+    Endpoint principal que recibe una búsqueda y un código de país,
+    ejecuta el scraper de Scrapy y devuelve los resultados procesados.
+    """
     if not q:
         raise HTTPException(status_code=400, detail="El parámetro 'q' es requerido.")
 
-    print(f"\n[APP] 🔎 NUEVA BÚSQUEDA: '{q}' (solo Mercado Libre)")
+    # El código de país ahora es proporcionado por el frontend.
+    # Usamos 'AR' como un valor por defecto seguro si no se envía.
+    country_code = country.upper()
+    
+    print(f"\n[ENDPOINT] 🔎 Búsqueda: '{q}', País: {country_code} (recibido del frontend)")
+    
+    # Lista para almacenar los resultados del scraper
+    raw_results = []
+    
+    # Comando para ejecutar Scrapy como un subproceso
+    command = [
+        SCRAPY_PATH, "crawl", "mercadolibre",
+        "-a", f"query={q}",
+        "-a", f"country={country_code}",
+        "-o", "-:jsonlines"
+    ]
+    
+    try:
+        # Ejecuta el comando y captura la salida
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,  # Lanza una excepción si el scraper falla
+            encoding="latin-1",
+            errors="ignore",
+            creationflags=subprocess.CREATE_NO_WINDOW  # Evita que se abra una ventana de consola en Windows
+        )
+        # Procesa cada línea de la salida como un objeto JSON
+        for line in result.stdout.splitlines():
+            clean_line = line.strip()
+            if clean_line.startswith("{") and clean_line.endswith("}"):
+                try:
+                    raw_results.append(json.loads(clean_line))
+                except json.JSONDecodeError:
+                    print(f"[ENDPOINT] ⚠️ Línea JSON inválida ignorada: {clean_line}")
+    except subprocess.CalledProcessError as e:
+        # Captura errores del propio scraper
+        print(f"[ENDPOINT] ❌ Error en el subproceso de Scrapy: {e.stderr}")
+    except Exception as e:
+        print(f"[ENDPOINT] ❌ Error inesperado ejecutando Scrapy: {e}")
 
-    # 1. Ejecutar spider y obtener resultados YA LIMPIOS
-    raw_results: list[dict] = []
-    t = threading.Thread(target=run_spider, args=("mercadolibre", q, raw_results))
-    t.start()
-    t.join(timeout=60.0)
-
-    # 2. Deduplicación (la única limpieza que queda aquí)
-    print(f"[APP] Se encontraron {len(raw_results)} resultados limpios (con posibles duplicados).")
+    # --- Procesamiento de los resultados ---
+    print(f"[ENDPOINT] Se encontraron {len(raw_results)} resultados crudos.")
+    
+    final_results = []
     seen_urls = set()
-    final_results: list[dict] = []
     for item in raw_results:
         url = item.get("url")
-        # Ahora solo verificamos que la URL exista y no esté duplicada
-        if url and url not in seen_urls:
+        # Filtra items duplicados o sin información de precio válida
+        if url and url not in seen_urls and isinstance(item.get("price_numeric"), (int, float)):
             seen_urls.add(url)
             final_results.append(item)
-
-    print(f"[APP] {len(final_results)} resultados ÚNICOS después de deduplicar.")
+    
+    print(f"[ENDPOINT] {len(final_results)} resultados únicos y válidos.")
     
     if not final_results:
         return {"query": q, "message": "No se encontraron resultados válidos."}
 
-    # 3. Orden final (usando los nuevos campos numéricos)
+    # Ordena los resultados por número de reseñas (descendente) y luego por precio (ascendente)
     final_results.sort(key=lambda x: (-x.get("reviews_count", 0), x.get("price_numeric", float('inf'))))
-
-    print(f"[APP] ✅ Se devolverán {len(final_results)} resultados al frontend.")
+    
+    print(f"[ENDPOINT] ✅ Devolviendo {len(final_results)} resultados al frontend.")
     return {"query": q, "results": final_results}

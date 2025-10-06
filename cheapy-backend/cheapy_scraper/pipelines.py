@@ -7,31 +7,26 @@ class DataCleaningPipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
 
-        # --- 1. Limpieza de Precio y Moneda (VERSIÓN MEJORADA) ---
+    # --- 1. Limpieza de Precio y Moneda ---
         price_str = adapter.get('price')
+        # Obtenemos la moneda que el spider nos pasó
+        currency_code = adapter.get('currency_code')
+        
         if price_str:
-            # Eliminar símbolos de moneda, espacios en blanco y cualquier cosa que no sea un número, punto o coma.
             cleaned_str = re.sub(r'[^\d,.]', '', price_str)
-            
-            # Lógica para manejar formatos de LATAM (ej: 1.234,56)
-            # 1. Quitar los puntos (separadores de miles)
             cleaned_str = cleaned_str.replace('.', '')
-            # 2. Reemplazar la coma (separador decimal) por un punto
             cleaned_str = cleaned_str.replace(',', '.')
 
             try:
-                # Ahora la conversión a float será precisa
                 adapter['price_numeric'] = float(cleaned_str)
-                # Por ahora, asumimos ARS para Mercado Libre Argentina
-                # En el futuro, podríamos detectar la moneda desde la página
-                adapter['currency'] = 'ARS' 
+                # Asignamos la moneda correcta
+                adapter['currency'] = currency_code
             except (ValueError, TypeError):
                 adapter['price_numeric'] = None
                 adapter['currency'] = None
         else:
-             adapter['price_numeric'] = None
-             adapter['currency'] = None
-
+            adapter['price_numeric'] = None
+            adapter['currency'] = None
         # --- 2. Limpieza de Calificación (Rating) ---
         # (Esta lógica ya estaba bien, pero la incluimos por completitud)
         rating_str = adapter.get('rating_str')
@@ -59,5 +54,6 @@ class DataCleaningPipeline:
         adapter.pop('price', None)
         adapter.pop('rating_str', None)
         adapter.pop('reviews_count_str', None)
+        adapter.pop('currency_code', None)
         
         return item
