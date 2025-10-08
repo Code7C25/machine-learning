@@ -1,5 +1,7 @@
+// cheapy-extension/popup.js
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Referencias a los elementos (SIN CAMBIOS)
+    // --- ELEMENTOS DE LA UI (Sin cambios) ---
     const resultsContainer = document.getElementById('results-container');
     const statusMessage = document.getElementById('status-message');
     const sortSelect = document.getElementById('sort-select');
@@ -10,47 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let allResults = [];
 
-    // --- 1. NUEVA FUNCIÓN AÑADIDA ---
-    // Esta función se encarga de obtener el país del usuario, usando un caché
-    // en la propia extensión para evitar llamadas innecesarias a la API.
-    const getUserCountry = async () => {
-        try {
-            const cache = await chrome.storage.local.get(['userCountry', 'countryCacheTimestamp']);
-            const now = new Date().getTime();
-
-            if (cache.userCountry && cache.countryCacheTimestamp && (now - cache.countryCacheTimestamp < 86400000)) { // 24 horas
-                console.log("País desde caché de extensión:", cache.userCountry);
-                return cache.userCountry;
-            }
-
-            console.log("Llamando a API de geolocalización desde la extensión...");
-            const response = await fetch("https://ipapi.co/json/");
-            if (!response.ok) return "AR"; // Fallback
-
-            const data = await response.json();
-            const country = data.country_code || "AR";
-            
-            await chrome.storage.local.set({ userCountry: country, countryCacheTimestamp: now });
-            console.log("País guardado en caché de extensión:", country);
-            return country;
-        } catch (error) {
-            console.error("Error geolocalizando desde el frontend:", error);
-            return "AR"; // Fallback en caso de error
-        }
-    };
-
-    // --- 2. LÓGICA INICIAL MODIFICADA ---
-    // Ahora es 'async' para poder usar 'await' y esperar el país.
+    // --- LÓGICA DE INICIO (Sin cambios) ---
     const initialize = async () => {
-        // Obtenemos el país ANTES de hacer nada más.
         const country = await getUserCountry();
-        
-        // El resto de la lógica es la misma, pero ya tenemos el país.
         chrome.storage.local.get(['lastSearchQuery'], (result) => {
             const query = result.lastSearchQuery;
             if (query) {
                 queryTitle.textContent = `Resultados para: "${query}"`;
-                // Pasamos el país obtenido a la función de búsqueda.
                 performSearch(query, country);
             } else {
                 statusMessage.textContent = 'Realiza una búsqueda en Google para empezar.';
@@ -58,15 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
-
-    // --- MANEJADORES DE EVENTOS (SIN CAMBIOS) ---
+    
+    // --- MANEJADORES DE EVENTOS Y FUNCIONES DE LA UI (Sin cambios) ---
     sortSelect.addEventListener('change', () => { displayAllResults(); });
     showAllButton.addEventListener('click', () => { showAllView(); });
     backToRecommendationsButton.addEventListener('click', () => { showRecommendationsView(); });
-    
-    // --- FUNCIONES PARA CONTROLAR LA VISIBILIDAD DE LA UI (SIN CAMBIOS) ---
-    const showLoadingState = (query) => { /* ...código original... */
-        statusMessage.textContent = `Analizando "${query}"...`;
+    const showLoadingState = (message) => {
+        statusMessage.textContent = message;
         statusMessage.style.display = 'block';
         recommendationsSection.style.display = 'none';
         resultsContainer.style.display = 'none';
@@ -74,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sortSelect.style.display = 'none';
         backToRecommendationsButton.style.display = 'none';
     };
-    const showRecommendationsView = () => { /* ...código original... */
+    const showRecommendationsView = () => {
         statusMessage.style.display = 'none';
         recommendationsSection.style.display = 'block';
         resultsContainer.style.display = 'none';
@@ -91,46 +57,109 @@ document.addEventListener('DOMContentLoaded', () => {
         backToRecommendationsButton.style.display = 'block';
         displayAllResults();
     };
+    const getUserCountry = async () => { /* ...código original... */
+        try {
+            const cache = await chrome.storage.local.get(['userCountry', 'countryCacheTimestamp']);
+            const now = new Date().getTime();
+            if (cache.userCountry && cache.countryCacheTimestamp && (now - cache.countryCacheTimestamp < 86400000)) {
+                return cache.userCountry;
+            }
+            const response = await fetch("https://ipapi.co/json/");
+            if (!response.ok) return "AR";
+            const data = await response.json();
+            const country = data.country_code || "AR";
+            await chrome.storage.local.set({ userCountry: country, countryCacheTimestamp: now });
+            return country;
+        } catch (error) {
+            console.error("Error geolocalizando desde el frontend:", error);
+            return "AR";
+        }
+    };
 
-    // --- 3. FUNCIÓN DE BÚSQUEDA MODIFICADA ---
-    // Ahora acepta 'country' como segundo argumento.
+
+    // ===================================================================
+    // ===               AQUÍ EMPIEZA LA NUEVA LÓGICA                  ===
+    // ===================================================================
+
+    /**
+     * PASO 1: Inicia la búsqueda en el backend.
+     * Esta función ahora solo envía la tarea y obtiene un ID de vuelta.
+     */
     const performSearch = async (query, country) => {
-        showLoadingState(query);
+        showLoadingState(`Analizando "${query}"...`);
         allResults = [];
         try {
-            // Se añade el parámetro &country=${country} a la URL del fetch.
             const response = await fetch(`http://127.0.0.1:8000/buscar?q=${encodeURIComponent(query)}&country=${country}`);
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                const detail = errorData?.detail || `Error del servidor: ${response.status}`;
-                throw new Error(detail);
-            }
+            if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
 
             const data = await response.json();
-            
-            if (data.results && data.results.length > 0) {
-                allResults = data.results;
-                displayRecommendations();
+
+            if (data.task_id) {
+                // ¡Éxito! Tenemos un ID de tarea. Ahora empezamos a preguntar por los resultados.
+                showLoadingState('Procesando tu búsqueda...');
+                pollForResults(data.task_id);
             } else {
-                statusMessage.textContent = 'No se encontraron resultados.';
+                throw new Error("No se recibió un ID de tarea del servidor.");
             }
         } catch (error) {
-            console.error('Error en la búsqueda:', error);
+            console.error('Error iniciando la búsqueda:', error);
             statusMessage.textContent = `Error de conexión: ${error.message}.`;
         }
     };
-    
-    // --- FUNCIONES DE RENDERIZADO (SIN CAMBIOS) ---
+
+    /**
+     * PASO 2: Pregunta (poll) por los resultados usando el ID de la tarea.
+     * Esta función se llama a sí misma cada 2 segundos hasta que obtiene un resultado.
+     */
+    const pollForResults = async (taskId, attempts = 0) => {
+        const MAX_ATTEMPTS = 30; // Máximo 30 intentos (30 * 2s = 1 minuto de timeout)
+
+        if (attempts >= MAX_ATTEMPTS) {
+            statusMessage.textContent = 'La búsqueda está tardando demasiado. Inténtalo de nuevo.';
+            return;
+        }
+
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/resultados/${taskId}`);
+            if (!response.ok) throw new Error(`Error del servidor al obtener resultados: ${response.status}`);
+
+            const data = await response.json();
+
+            if (data.status === 'SUCCESS') {
+                // ¡LO LOGRAMOS! Los resultados están listos.
+                const results = data.results || [];
+
+                if (results.error) {
+                     // El worker terminó pero con un error.
+                    statusMessage.textContent = `Error en el scraper: ${results.error}`;
+                    return;
+                }
+
+                if (results.length > 0) {
+                    allResults = results;
+                    displayRecommendations();
+                } else {
+                    statusMessage.textContent = 'No se encontraron resultados para tu búsqueda.';
+                }
+            } else if (data.status === 'FAILURE') {
+                // La tarea falló catastróficamente.
+                statusMessage.textContent = 'La tarea de búsqueda falló en el servidor.';
+            } else {
+                // La tarea todavía está en progreso (PENDING). Esperamos y volvemos a preguntar.
+                setTimeout(() => pollForResults(taskId, attempts + 1), 2000); // Espera 2 segundos
+            }
+        } catch (error) {
+            console.error('Error durante el sondeo de resultados:', error);
+            statusMessage.textContent = `Error de conexión al obtener resultados: ${error.message}`;
+        }
+    };
+
+
+    // --- FUNCIONES DE RENDERIZADO (Sin cambios) ---
     const displayRecommendations = () => { /* ...código original... */
         recommendationsSection.innerHTML = '';
         const cheapest = [...allResults].sort((a, b) => a.price_numeric - b.price_numeric)[0];
-        const bestValue = [...allResults]
-            .filter(item => item.reviews_count > 0)
-            .sort((a, b) => {
-                if (b.rating !== a.rating) return b.rating - a.rating;
-                return b.reviews_count - a.reviews_count;
-            })[0] || cheapest;
+        const bestValue = [...allResults].filter(item => item.reviews_count > 0).sort((a, b) => { if (b.rating !== a.rating) return b.rating - a.rating; return b.reviews_count - a.reviews_count; })[0] || cheapest;
         recommendationsSection.appendChild(createResultCard(cheapest, { label: 'Más Barato', className: 'cheapest' }));
         if (cheapest && bestValue && cheapest.url !== bestValue.url) {
             recommendationsSection.appendChild(createResultCard(bestValue, { label: 'Mejor Calidad-Precio', className: 'best-value' }));
@@ -143,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortedResults = [...allResults];
         const sortBy = sortSelect.value;
         if (sortBy === 'price_asc') sortedResults.sort((a, b) => a.price_numeric - b.price_numeric);
-        else if (sortBy === 'price_desc') sortedResults.sort((a, b) => b.price_numeric - a.price_numeric);
+        else if (sortBy === 'price_desc') sortedResults.sort((a, b) => b.price_numeric - b.price_numeric);
         else if (sortBy === 'reviews') sortedResults.sort((a, b) => b.reviews_count - a.reviews_count);
         sortedResults.forEach(item => resultsContainer.appendChild(createResultCard(item)));
     };
@@ -160,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         a.appendChild(textContent); li.appendChild(a); return li;
     };
 
-    // Iniciar la aplicación
+
+    // --- Iniciar la aplicación ---
     initialize();
 });

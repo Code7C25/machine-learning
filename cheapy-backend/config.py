@@ -1,39 +1,16 @@
-# Este archivo centraliza la información compartida entre diferentes partes de la aplicación.
+# cheapy-backend/config.py
 
-# Mapeo de códigos de país a sus monedas oficiales (ISO 4217)
-# Esta lista es genérica y puede ser usada por CUALQUIER spider.
-COUNTRY_CURRENCIES = {
-    'AR': 'ARS', 'MX': 'MXN', 'CO': 'COP', 'CL': 'CLP', 'BR': 'BRL',
-    'UY': 'UYU', 'PE': 'PEN', 'CR': 'CRC', 'GT': 'GTQ', 'HN': 'HNL',
-    'NI': 'NIO', 'PA': 'PAB', 'SV': 'USD', 'DO': 'DOP', 'BO': 'BOB',
-    'PY': 'PYG', 'VE': 'VES', 'EC': 'USD', 'CU': 'CUP',
-    
-    # Países para futuros spiders
-    'US': 'USD', # Estados Unidos
-    'CA': 'CAD', # Canadá
-    'ES': 'EUR', # España
-    'DE': 'EUR', # Alemania
-    'FR': 'EUR', # Francia
-    'IT': 'EUR', # Italia
-    'GB': 'GBP', # Reino Unido
-    'JP': 'JPY', # Japón
-    'CN': 'CNY', # China
-    'AU': 'AUD', # Australia
-    'IN': 'INR', # India
-}
-
-# Mapeo específico para el spider de Mercado Libre
-# Contiene el dominio específico de la tienda para cada país.
+# Diccionario de dominios de Mercado Libre por país
 MERCADOLIBRE_DOMAINS = {
-    'AR': 'com.ar', 'MX': 'com.mx', 'CO': 'com.co', 'CL': 'cl', 'BR': 'com.br',
-    'UY': 'com.uy', 'PE': 'com.pe', 'CR': 'co.cr', 'GT': 'com.gt', 'HN': 'com.hn',
-    'NI': 'com.ni', 'PA': 'com.pa', 'SV': 'com.sv', 'DO': 'com.do', 'BO': 'com.bo',
-    'PY': 'com.py', 'VE': 'com.ve', 'EC': 'com.ec', 'CU': 'com.cu',
+    'AR': 'com.ar', 'BO': 'com.bo', 'BR': 'com.br', 'CL': 'cl',
+    'CO': 'com.co', 'CR': 'co.cr', 'DO': 'com.do', 'EC': 'com.ec',
+    'GT': 'com.gt', 'HN': 'com.hn', 'MX': 'com.mx', 'NI': 'com.ni',
+    'PA': 'com.pa', 'PY': 'com.py', 'PE': 'com.pe', 'SV': 'com.sv',
+    'UY': 'com.uy', 'VE': 'co.ve'
 }
 
-# Podrías añadir configuraciones para futuros spiders aquí
-# AMAZON_DOMAINS = {
-#     'US': 'com', 'CA': 'ca', 'MX': 'com.mx', 'ES': 'es', 'DE': 'de', 
-#     'FR': 'fr', 'IT': 'it', 'GB': 'co.uk', 'JP': 'co.jp', 'CN': 'cn',
-#     'AU': 'com.au', 'IN': 'in', 'BR': 'com.br',
-# }
+# Diccionario de monedas por país (puedes expandir esto)
+COUNTRY_CURRENCIES = {
+    'AR': 'ARS', 'CL': 'CLP', 'CO': 'COP', 'MX': 'MXN', 'BR': 'BRL', 'PE': 'PEN', 'UY': 'UYU'
+    # Añadir más según sea necesario
+}

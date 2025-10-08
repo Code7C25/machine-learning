@@ -3,6 +3,8 @@ uvicorn
 scrapy
 httpx
 beautifulsoup4
-crochet
 scrapy-playwright
 playwright
+celery
+redis
+# instalar https://github.com/microsoftarchive/redis/releases

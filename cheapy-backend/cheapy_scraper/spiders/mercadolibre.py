@@ -1,6 +1,7 @@
 # cheapy-backend/cheapy_scraper/spiders/mercadolibre.py
 
 import scrapy
+from cheapy_scraper.items import ProductItem
 # Se importan las configuraciones centralizadas
 from config import MERCADOLIBRE_DOMAINS, COUNTRY_CURRENCIES
 
@@ -59,16 +60,16 @@ class MercadoLibreSpider(scrapy.Spider):
             final_price_fraction = price_fraction_discount or price_fraction_normal or price_fraction
             price_full_str = f"{price_symbol or ''}{final_price_fraction or ''}"
 
-            yield {
-                'title': title,
-                'url': url,
-                'image_url': image_url,
-                'source': self.name,
-                'price': price_full_str if final_price_fraction else None,
-                'rating_str': rating_str,
-                'reviews_count_str': reviews_count_str,
-                'currency_code': self.currency,
-            }
+            product = ProductItem()
+            product['title'] = title
+            product['url'] = url
+            product['image_url'] = image_url
+            product['source'] = self.name
+            product['price'] = price_full_str if final_price_fraction else None
+            product['rating_str'] = rating_str
+            product['reviews_count_str'] = reviews_count_str
+            product['currency_code'] = self.currency
+            yield product
 
         # Lógica de paginación EXACTAMENTE como la tenías
         if self.page_count < self.MAX_PAGES:
