@@ -167,14 +167,48 @@ document.addEventListener('DOMContentLoaded', () => {
         showAllButton.textContent = `Ver los ${allResults.length} resultados`;
         showRecommendationsView();
     };
-    const displayAllResults = () => { /* ...código original... */
-        resultsContainer.innerHTML = '';
-        const sortedResults = [...allResults];
-        const sortBy = sortSelect.value;
-        if (sortBy === 'price_asc') sortedResults.sort((a, b) => a.price_numeric - b.price_numeric);
-        else if (sortBy === 'price_desc') sortedResults.sort((a, b) => b.price_numeric - b.price_numeric);
-        else if (sortBy === 'reviews') sortedResults.sort((a, b) => b.reviews_count - a.reviews_count);
-        sortedResults.forEach(item => resultsContainer.appendChild(createResultCard(item)));
+   const displayAllResults = () => {
+    resultsContainer.innerHTML = '';
+    const sortedResults = [...allResults];
+    const sortBy = sortSelect.value;
+
+    sortedResults.sort((a, b) => {
+        // Preparamos valores por defecto para todos los campos que usaremos para ordenar
+        const priceA = a.price_numeric ?? 0;
+        const priceB = b.price_numeric ?? 0;
+        const reviewsA = a.reviews_count ?? 0;
+        const reviewsB = b.reviews_count ?? 0;
+        const ratingA = a.rating ?? 0;
+        const ratingB = b.rating ?? 0;
+
+        switch (sortBy) {
+            case 'price_asc':
+                // Ordena por precio, de menor a mayor
+                return priceA - priceB;
+                
+            case 'price_desc':
+                // Ordena por precio, de mayor a menor
+                return priceB - priceA;
+                
+            case 'reviews':
+                // --- NUEVA LÓGICA PARA 'reviews' ---
+                // Ordena por cantidad de reseñas, de mayor a menor
+                return reviewsB - reviewsA;
+                
+            case 'relevance':
+            default:
+                // --- NUEVA LÓGICA PARA 'relevance' ---
+                // Ordena por calificación (estrellas), de mayor a menor.
+                // Si dos productos tienen la misma calificación, el que tenga más reseñas irá primero.
+                if (ratingB !== ratingA) {
+                    return ratingB - ratingA;
+                }
+                // Si el rating es igual, se usa el número de reseñas como desempate
+                return reviewsB - reviewsA;
+        }
+    });
+
+    sortedResults.forEach(item => resultsContainer.appendChild(createResultCard(item)));
     };
     const createResultCard = (item, categoryInfo = {}) => { /* ...código original... */
         if (!item) return document.createDocumentFragment();
