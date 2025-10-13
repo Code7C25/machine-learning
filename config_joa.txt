@@ -7,5 +7,9 @@ para iniciar ubicord o cualquier accion de python por alguna razon la PC mia nec
 
 configuracion para redis:
 termianl 1 (en la carpeta backend): celery -A worker.tasks worker --loglevel=info --pool=solo
-termianl 2 (en la carpeta backend): uvicorn api.app:app --reload
+termianl 2 (en la carpeta backend): uvicorn api.app:app --reload --host 0.0.0.0
 usar redis-cli ping para asegurarse que ande redis
+
+
+en la terminal 1. para configurar la cantidad de hilos que puede crear:
+celery -A worker.celery_app worker --loglevel=info -P solo

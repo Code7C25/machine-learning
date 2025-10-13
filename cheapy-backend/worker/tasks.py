@@ -1,18 +1,17 @@
-# worker/tasks.py
+# cheapy-backend/worker/tasks.py
+
 import subprocess
 import json
 import sys
 from pathlib import Path
 from .celery_app import celery
 
-# Definimos la ruta base del proyecto Scrapy
-SCRAPY_PROJECT_PATH = str(Path(__file__).resolve().parent.parent / "cheapy_scraper")
+SCRAPY_PROJECT_PATH = str(Path(__file__).resolve().parent.parent)
 
-@celery.task
+# --- ¡CAMBIO IMPORTANTE! ---
+# Le damos un nombre explícito a la tarea. Este será su identificador único.
+@celery.task(name='run_scrapy_spider_task')
 def run_scrapy_spider(query: str, country: str):
-    """
-    Una tarea de Celery que ejecuta el spider de Scrapy en un subproceso.
-    """
     command = [
         sys.executable, "-m", "scrapy", "crawl", "mercadolibre",
         "-a", f"query={query}",
@@ -21,19 +20,13 @@ def run_scrapy_spider(query: str, country: str):
     ]
     
     try:
+        # ... (el resto de la función es idéntico a la que ya tienes)
         result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=True,
-            encoding="utf-8",
-            errors="ignore",
-            cwd=SCRAPY_PROJECT_PATH
+            command, capture_output=True, text=True, check=True,
+            encoding="utf-8", errors="ignore", cwd=SCRAPY_PROJECT_PATH
         )
-        
         raw_results = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
-
-        # Procesamiento y ordenamiento de resultados
+        # ... (procesamiento y ordenamiento)
         final_results = []
         seen_urls = set()
         for item in raw_results:
@@ -41,15 +34,9 @@ def run_scrapy_spider(query: str, country: str):
             if url and url not in seen_urls and isinstance(item.get("price_numeric"), (int, float)):
                 seen_urls.add(url)
                 final_results.append(item)
-        
         final_results.sort(key=lambda x: (-x.get("reviews_count", 0), x.get("price_numeric", float('inf'))))
-        
-        return final_results # Celery guardará este retorno en el backend de resultados (Redis)
-
-    except subprocess.CalledProcessError as e:
-        # Si el scraper falla, podemos devolver el error para que el frontend lo sepa
-        print(f"ERROR en Subproceso Scrapy: {e.stderr}")
-        return {"error": "El scraper falló", "details": e.stderr}
+        return final_results
     except Exception as e:
-        print(f"ERROR Inesperado: {e}")
-        return {"error": "Ocurrió un error inesperado en el worker", "details": str(e)}
+        print(f"ERROR en Worker: {e}")
+        # En caso de error, es mejor que la tarea falle para que podamos verlo en el status
+        raise e
