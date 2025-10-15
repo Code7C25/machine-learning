@@ -205,3 +205,12 @@ body {
 .back-btn:hover {
     text-decoration: underline;
 }
+
+#recommendations-view, #all-results-view {
+    display: flex;
+    /* ¡ESTA ES LA LÍNEA CLAVE QUE FALTABA! */
+    flex-direction: column; /* Apila los elementos hijos verticalmente */
+
+    flex-grow: 1; 
+    overflow: hidden;
+}

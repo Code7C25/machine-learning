@@ -12,4 +12,5 @@ usar redis-cli ping para asegurarse que ande redis
 
 
 en la terminal 1. para configurar la cantidad de hilos que puede crear:
-celery -A worker.celery_app worker --loglevel=info -P solo
+celery -A worker.celery_app worker --loglevel=info -c 4
+celery -A worker.celery_app worker --loglevel=info -P threads -c 4

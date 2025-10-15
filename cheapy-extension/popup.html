@@ -2,43 +2,41 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <!-- Asumiendo que icon48.png está en una carpeta 'icons' -->
             <img src="icons/icon.png" alt="Cheapy Logo" class="logo">
-            <!-- ID REQUERIDO -->
             <h1 id="query-title">Cheapy</h1> 
         </div>
         
-        <!-- ID REQUERIDO -->
-        <div id="status-message">Cargando...</div>
+        <!-- Contenedor para mensajes de estado -->
+        <div id="status-message" style="display: none;">Cargando...</div>
 
-        <!-- ID REQUERIDO -->
-        <div id="recommendations" class="results-section">
-            <!-- Las tarjetas de recomendación se insertarán aquí -->
+        <!-- Vista de Recomendaciones -->
+        <div id="recommendations-view" style="display: none;">
+            <div id="recommendations" class="results-section">
+                <!-- Tarjetas de recomendación aquí -->
+            </div>
+            <button id="show-all-button" class="action-btn">Ver todos los resultados</button>
         </div>
 
-        <!-- ID REQUERIDO -->
-        <button id="show-all-button" class="show-all-btn" style="display: none;">Ver todos los resultados</button>
-        
-        <!-- ID REQUERIDO -->
-        <select id="sort-select" style="display: none;">
-            <option value="relevance">Ordenar por: Relevancia</option>
-            <option value="price_asc">Precio: más bajo primero</option>
-            <option value="price_desc">Precio: más alto primero</option>
-            <option value="reviews">Más reseñas</option>
-        </select>
-        
-        <!-- ID REQUERIDO -->
-        <ul id="results-container">
-            <!-- Las tarjetas de resultados se insertarán aquí -->
-        </ul>
-
-        <button id="back-to-recommendations-button" class="show-all-btn" style="display: none;">← Volver a recomendaciones</button>
+        <!-- Vista de "Todos los Resultados" -->
+        <div id="all-results-view" style="display: none;">
+            <select id="sort-select">
+                <option value="relevance">Ordenar por: Relevancia</option>
+                <option value="price_asc">Precio: más bajo primero</option>
+                <option value="price_desc">Precio: más alto primero</option>
+                <option value="reviews">Más reseñas</option>
+            </select>
+            
+            <ul id="results-container">
+                <!-- Lista completa de resultados aquí -->
+            </ul>
+            
+            <button id="back-to-recommendations-button" class="action-btn">↑ Volver a recomendaciones</button>
+        </div>
     </div>
     <script src="popup.js"></script>
 </body>

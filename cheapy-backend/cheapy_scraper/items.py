@@ -11,6 +11,7 @@ class ProductItem(scrapy.Item):
     rating_str = scrapy.Field()      # Rating crudo (ej: "4.5")
     reviews_count_str = scrapy.Field() # Reviews crudo (ej: "(150)")
     currency_code = scrapy.Field()   # Código de moneda pasado por el spider (ej: "ARS")
+    country_code = scrapy.Field()
 
     # --- Datos generados por el Pipeline ---
     price_numeric = scrapy.Field()   # Precio limpio (ej: 1500000.0)

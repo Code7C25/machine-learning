@@ -69,6 +69,7 @@ class MercadoLibreSpider(scrapy.Spider):
             product['rating_str'] = rating_str
             product['reviews_count_str'] = reviews_count_str
             product['currency_code'] = self.currency
+            product['country_code'] = self.country_code
             yield product
 
         # Lógica de paginación EXACTAMENTE como la tenías
