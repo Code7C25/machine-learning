@@ -29,7 +29,12 @@ EBAY_DOMAINS = {
 }
 
 ALIEXPRESS_DOMAINS = {
-    'US': 'com', 'ES': 'es', 'FR': 'fr', 'DE': 'de', 'IT': 'it', 'BR': 'com.br',
+    'ES': 'es.aliexpress.com',
+    'FR': 'fr.aliexpress.com',
+    'DE': 'de.aliexpress.com',
+    'IT': 'it.aliexpress.com',
+    'BR': 'pt.aliexpress.com', # Para Brasil, es el subdominio de portugués
+    'US': 'www.aliexpress.com', # Para EEUU y por defecto, es www.
 }
 
 # --- Cerebro del Despachador ---

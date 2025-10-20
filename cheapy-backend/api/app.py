@@ -75,7 +75,7 @@ def buscar_producto(q: str, request: Request):
     
     # --- MODO DE PRUEBA ---
     # Descomenta UNA de las siguientes líneas para forzar un país específico.
-    # country_code = "US"  # Para probar EEUU (Amazon, eBay, AliExpress)
+    country_code = "US"  # Para probar EEUU (Amazon, eBay, AliExpress)
     # country_code = "MX"  # Para probar México (Mercado Libre, Amazon)
     # country_code = "ES"  # Para probar España (Amazon, eBay, AliExpress)
     
