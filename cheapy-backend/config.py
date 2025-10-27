@@ -41,7 +41,7 @@ ALIEXPRESS_DOMAINS = {
 # Mapeo de país a una lista de spiders que se ejecutarán para ese país.
 COUNTRY_TO_SPIDERS = {
     # LATAM
-    'AR': ['mercadolibre'],
+    'AR': ['mercadolibre','fravega'],
     'CO': ['mercadolibre'],
     'CL': ['mercadolibre'],
     
