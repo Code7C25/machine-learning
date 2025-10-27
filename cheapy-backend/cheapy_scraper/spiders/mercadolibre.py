@@ -1,13 +1,15 @@
 # cheapy-backend/cheapy_scraper/spiders/mercadolibre.py
 
 import scrapy
+from urllib.parse import urlparse, parse_qs, urlunparse, urlencode 
 from cheapy_scraper.items import ProductItem
 # Se importan las configuraciones centralizadas
 from config import MERCADOLIBRE_DOMAINS, COUNTRY_CURRENCIES
 
 class MercadoLibreSpider(scrapy.Spider):
     name = "mercadolibre"
-    MAX_PAGES = 4
+    MAX_PAGES = 2
+    ITEMS_PER_PAGE = 48 # Número típico de ítems por página en MercadoLibre
     
     # El diccionario 'meli_domains' se ha movido a config.py
     
@@ -72,12 +74,46 @@ class MercadoLibreSpider(scrapy.Spider):
             product['country_code'] = self.country_code
             yield product
 
-        # Lógica de paginación EXACTAMENTE como la tenías
+         # --- Lógica de Paginación MODIFICADA (Basada en Offset) ---
         if self.page_count < self.MAX_PAGES:
-            next_page_url = response.css('li.andes-pagination__button--next a.andes-pagination__link::attr(href)').get()
-            if next_page_url:
-                yield scrapy.Request(url=next_page_url, callback=self.parse)
+            
+            parsed_url = urlparse(response.url)
+            query_params = parse_qs(parsed_url.query)
+            
+            # 1. Determinar el desplazamiento actual
+            # ML usa _Desde. Si no está, asumimos que estamos en el inicio (offset 0).
+            # parse_qs devuelve listas, por eso usamos [0]
+            current_offset_str = query_params.get('_Desde', ['0'])[0]
+            
+            try:
+                current_offset = int(current_offset_str)
+            except ValueError:
+                # Si el valor no es un número (ej: está vacío), empezamos desde 0
+                current_offset = 0 
+                
+            # 2. Calcular el nuevo desplazamiento
+            new_offset = current_offset + self.ITEMS_PER_PAGE
+            
+            # 3. Reemplazar o añadir el nuevo parámetro _Desde
+            query_params['_Desde'] = [str(new_offset)]
+
+            # 4. Reconstruir la URL
+            # urlencode convierte el diccionario de parámetros de nuevo en una cadena de consulta
+            new_query = urlencode(query_params, doseq=True)
+            
+            # urlunparse reconstruye la URL con la nueva cadena de consulta
+            next_page_url = urlunparse(parsed_url._replace(query=new_query, fragment=''))
+            
+            self.logger.info(f"Calculado: Próxima URL de búsqueda con offset: {new_offset}")
+
+            # 5. Yield la nueva solicitud
+            yield scrapy.Request(
+                url=next_page_url, 
+                headers=self.custom_headers, # ¡Asegúrate de pasar los headers aquí!
+                callback=self.parse
+            )
 
     def start_requests(self):
         for url in self.start_urls:
+            # Aseguramos que la primera solicitud también use los headers
             yield scrapy.Request(url, headers=self.custom_headers, callback=self.parse)
