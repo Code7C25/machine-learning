@@ -90,62 +90,6 @@ def buscar_producto(q: str, request: Request, country: str = None):
     return {"task_id": result_group.id}
 
 
-@app.get("/buscar")
-def buscar_producto(q: str, request: Request):
-    if not q:
-        raise HTTPException(status_code=400, detail="El parámetro 'q' es requerido.")
-
-    # --- PASO 1: Determinar el país ---
-    client_ip = request.client.host
-    # La geolocalización automática funciona, pero la sobreescribiremos para las pruebas.
-    country_code = get_country_from_ip(client_ip)
-    
-    # --- MODO DE PRUEBA ---
-    # Descomenta UNA de las siguientes líneas para forzar un país específico.
-    # country_code = "US"  # Para probar EEUU (Amazon, eBay, AliExpress)
-    # country_code = "MX"  # Para probar México (Mercado Libre, Amazon)
-    # country_code = "ES"  # Para probar España (Amazon, eBay, AliExpress)
-    country_code = "AR"
-    
-    # --- PASO 2: Decidir qué spiders ejecutar ---
-    # Busca en el diccionario de config.py la lista de spiders para ese país.
-    spiders_to_run = COUNTRY_TO_SPIDERS.get(country_code, [])
-
-    if not spiders_to_run:
-        # Si no hay spiders configurados para ese país, devuelve un error amigable.
-        print(f"API: No hay spiders para la región '{country_code}'.")
-        # Es importante devolver un task_id nulo para que el frontend sepa que no debe esperar.
-        return {"task_id": None, "error": f"No hay tiendas soportadas para tu región ({country_code})."}
-
-    print(f"API: Tarea recibida para '{q}' en '{country_code}'. Spiders a ejecutar: {spiders_to_run}")
-
-    # --- PASO 3: Crear y despachar el grupo de tareas a Celery ---
-    
-    # Se crea una "firma" de tarea para cada spider que necesitamos ejecutar.
-    # Cada firma es una plantilla de la tarea con sus argumentos.
-    task_signatures = [
-        celery_app.signature(
-            'run_scrapy_spider_task', 
-            kwargs={'spider_name': name, 'query': q, 'country': country_code}
-        )
-        for name in spiders_to_run
-    ]
-
-    # 'group' agrupa todas las firmas para que se puedan ejecutar en paralelo.
-    task_group = group(task_signatures)
-    
-    # '.apply_async()' envía el grupo de tareas a la cola de Redis.
-    result_group = task_group.apply_async()
-
-    # Guardamos la estructura del grupo en el backend de resultados (Redis)
-    # para poder recuperarla más tarde con su ID.
-    result_group.save()
-    
-    # --- PASO 4: Devolver el ID del grupo de tareas al frontend ---
-    # La API responde inmediatamente, sin esperar a que los spiders terminen.
-    return {"task_id": result_group.id}
-
-
 @app.get("/resultados/{task_id}")
 def get_status(task_id: str):
     result_group = GroupResult.restore(task_id, app=celery_app)
@@ -156,7 +100,7 @@ def get_status(task_id: str):
         # --- ¡CORRECCIÓN IMPORTANTE AQUÍ! ---
         # Aplanamos la lista de listas en una sola lista de resultados.
         results_from_worker_group = result_group.get(propagate=False)
-        print(f"[DEBUG-API] Resultados recuperados de Redis: {results_from_worker_group}") # <-- Tu print de depuración
+        print(f"[API] Resultados recuperados de Redis. {len(results_from_worker_group)} tareas del grupo respondieron.")
         
         all_results = [item for sublist in results_from_worker_group if sublist for item in sublist]
 
