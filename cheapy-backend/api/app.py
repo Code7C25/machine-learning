@@ -49,19 +49,46 @@ def get_country_from_ip(ip: str) -> str:
     except Exception: return default_country
     finally: conn.close()
 
-# --- ENDPOINTS ORIGINAL---
-# @app.get("/buscar")
-# def buscar_producto(q: str, request: Request):
-#     client_ip = request.client.host
-#     country_code = get_country_from_ip(client_ip)
-#     spiders_to_run = COUNTRY_TO_SPIDERS.get(country_code, [])
-#     if not spiders_to_run: return {"task_id": None, "error": f"No hay tiendas para tu región ({country_code})."}
+# --- ENDPOINTS (MODIFICADOS) ---
+
+@app.get("/buscar")
+def buscar_producto(q: str, request: Request, country: str = None):
+    """
+    Busca un producto. Prioriza el país enviado por el cliente.
+    Si no se envía, usa geolocalización por IP como fallback.
+    """
+    if not q:
+        raise HTTPException(status_code=400, detail="El parámetro 'q' es requerido.")
+
+    country_code = ""
+    if country:
+        # Si el frontend envía un país, lo usamos.
+        country_code = country.upper()
+        print(f"API: País '{country_code}' recibido del frontend.")
+    else:
+        # Si no, usamos la geolocalización del backend como fallback.
+        print("API: No se recibió país del frontend. Usando geolocalización por IP...")
+        client_ip = request.client.host
+        country_code = get_country_from_ip(client_ip)
     
-#     print(f"API: Tarea para '{q}' en '{country_code}'. Spiders: {spiders_to_run}")
-#     task_signatures = [celery_app.signature('run_scrapy_spider_task', kwargs={'spider_name': name, 'query': q, 'country': country_code}) for name in spiders_to_run]
-#     result_group = group(task_signatures).apply_async()
-#     result_group.save()
-#     return {"task_id": result_group.id}
+    # --- MODO DE PRUEBA (OPCIONAL) ---
+    # Para forzar un país durante el desarrollo, puedes sobreescribir la variable aquí.
+    #country_code = "US"
+    
+    spiders_to_run = COUNTRY_TO_SPIDERS.get(country_code, [])
+    if not spiders_to_run:
+        return {"task_id": None, "error": f"No hay tiendas para tu región ({country_code})."}
+
+    print(f"API: Tarea recibida para '{q}' en '{country_code}'. Spiders: {spiders_to_run}")
+
+    task_signatures = [
+        celery_app.signature('run_scrapy_spider_task', kwargs={'spider_name': name, 'query': q, 'country': country_code})
+        for name in spiders_to_run
+    ]
+    result_group = group(task_signatures).apply_async()
+    result_group.save()
+    return {"task_id": result_group.id}
+
 
 @app.get("/buscar")
 def buscar_producto(q: str, request: Request):

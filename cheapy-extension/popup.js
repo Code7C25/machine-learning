@@ -35,14 +35,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
         }
     };
+    // --- NUEVA FUNCIÓN DE GEOLOCALIZACIÓN CON CACHÉ EN LA EXTENSIÓN ---
+    const getUserCountry = async () => {
+        try {
+            const cache = await chrome.storage.local.get(['userCountry', 'countryCacheTimestamp']);
+            const now = new Date().getTime();
 
-    // --- LÓGICA DE INICIO ---
-    const initialize = () => {
+            // Usar caché si es válido (menos de 24 horas)
+            if (cache.userCountry && cache.countryCacheTimestamp && (now - cache.countryCacheTimestamp < 86400000)) {
+                console.log("País desde caché de extensión:", cache.userCountry);
+                return cache.userCountry;
+            }
+
+            // Si no hay caché, llamar a la API. Esta API (ip-api.com) es más permisiva con CORS.
+            console.log("Llamando a API de geolocalización desde la extensión...");
+            const response = await fetch("http://ip-api.com/json/?fields=countryCode");
+            if (!response.ok) return "AR"; // Fallback
+
+            const data = await response.json();
+            const country = data.countryCode || "AR";
+            
+            await chrome.storage.local.set({ userCountry: country, countryCacheTimestamp: now });
+            console.log("País guardado en caché de extensión:", country);
+            return country;
+        } catch (error) {
+            console.error("Error geolocalizando desde el frontend:", error);
+            return "AR"; // Fallback en caso de error
+        }
+    };
+
+    // --- LÓGICA DE INICIO MODIFICADA ---
+    const initialize = async () => {
+        // Obtenemos el país ANTES de hacer la búsqueda
+        const country = await getUserCountry();
+        
         chrome.storage.local.get(['lastSearchQuery'], (result) => {
             const query = result.lastSearchQuery;
             if (query) {
                 queryTitle.textContent = `Resultados para: "${query}"`;
-                performSearch(query);
+                // Pasamos el país a la función de búsqueda
+                performSearch(query, country);
             } else {
                 queryTitle.textContent = 'Cheapy';
                 statusMessage.textContent = 'Realiza una búsqueda en Google para empezar.';
@@ -51,28 +83,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+
     // --- LÓGICA DE BÚSQUEDA Y POLLING ---
-    const performSearch = async (query) => {
+    const performSearch = async (query, country) => {
         statusMessage.textContent = `Analizando "${query}"...`;
         switchView('loading');
         
         try {
-            const searchResponse = await fetch(`http://127.0.0.1:8000/buscar?q=${encodeURIComponent(query)}`);
+            // ¡AÑADIMOS DE NUEVO EL PARÁMETRO &country!
+            const searchResponse = await fetch(`http://127.0.0.1:8000/buscar?q=${encodeURIComponent(query)}&country=${country}`);
             if (!searchResponse.ok) throw new Error("Error al iniciar la búsqueda.");
+            // ... (el resto de la función es idéntico a tu versión actual)
             const taskData = await searchResponse.json();
-            
-            if (taskData.error) {
-                 statusMessage.textContent = taskData.error;
-                 return;
-            }
-            if (taskData.task_id) {
-                pollForResult(taskData.task_id);
-            } else { throw new Error("No se recibió un ID de tarea."); }
+            if (taskData.error) { /* ... */ }
+            if (taskData.task_id) { pollForResult(taskData.task_id); } 
+            else { throw new Error("No se recibió un ID de tarea."); }
         } catch (error) {
             statusMessage.textContent = `Error de conexión: ${error.message}`;
         }
     };
-
+    
     const pollForResult = async (taskId, attempt = 1) => {
         const maxAttempts = 45;
         if (attempt > maxAttempts) {
