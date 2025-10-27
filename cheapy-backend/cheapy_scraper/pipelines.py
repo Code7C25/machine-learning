@@ -1,5 +1,41 @@
 import re
 from itemadapter import ItemAdapter
+from scrapy.exceptions import DropItem # ¡Necesitas importar esto!
+
+# ===============================================
+# NUEVA PIPELINE DE DEDUPLICACIÓN
+# ===============================================
+
+class DuplicatesPipeline:
+    """
+    Elimina ítems duplicados basándose en la URL normalizada del producto.
+    """
+    def __init__(self):
+        # Usamos un conjunto (set) para almacenar las URLs vistas en esta corrida.
+        self.urls_seen = set()
+
+    def process_item(self, item, spider):
+        adapter = ItemAdapter(item)
+        url = adapter.get('url') 
+        
+        # Es crucial que la URL haya sido normalizada en el Spider (Paso 3)
+        if not url:
+            # Si no hay URL, el ítem no puede ser rastreado, lo descartamos
+            raise DropItem("Item sin URL detectado, descartando.")
+
+        if url in self.urls_seen:
+            # Si la URL ya fue vista, descartamos el ítem duplicado.
+            spider.logger.debug(f"Descartando ítem duplicado: {adapter['title']} - {url}")
+            raise DropItem(f"Item duplicado encontrado: {url}")
+        else:
+            # Si es nuevo, lo añadimos al conjunto y lo pasamos al siguiente pipeline.
+            self.urls_seen.add(url)
+            return item
+
+# ===============================================
+# TU PIPELINE DE LIMPIEZA EXISTENTE
+# ===============================================
+
 
 class DataCleaningPipeline:
     def process_item(self, item, spider):

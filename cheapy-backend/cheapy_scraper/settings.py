@@ -52,5 +52,9 @@ DOWNLOAD_DELAY = 1
 #TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 ITEM_PIPELINES = {
-   "cheapy_scraper.pipelines.DataCleaningPipeline": 300,
+   # 1. Deduplicación (Se ejecuta primero, prioridad más baja)
+    'cheapy_scraper.pipelines.DuplicatesPipeline': 100,
+    
+   # 2. Limpieza de Datos (Se ejecuta después de la deduplicación)
+    'cheapy_scraper.pipelines.DataCleaningPipeline': 300, 
 }
