@@ -4,16 +4,16 @@
     "version": "1.0",
     "description": "Compara precios en distintas tiendas online.",
     "icons": {
-        "16": "icons/Ic_message_48px.svg.png",
-        "48": "icons/Ic_message_48px.svg.png",
-        "128": "icons/Ic_message_48px.svg.png"
+        "16": "icons/48x48_Cheapy logo.png",
+        "48": "icons/48x48_Cheapy logo.png",
+        "128": "icons/48x48_Cheapy logo.png"
     },
     "action": {
         "default_popup": "popup.html",
         "default_icon": {
-            "16": "icons/Ic_message_48px.svg.png",
-            "48": "icons/Ic_message_48px.svg.png",
-            "128": "icons/Ic_message_48px.svg.png"
+            "16": "icons/48x48_Cheapy logo.png",
+            "48": "icons/48x48_Cheapy logo.png",
+            "128": "icons/48x48_Cheapy logo.png"
         }
     },
     "permissions": ["storage", "activeTab", "scripting" ,"webNavigation"],

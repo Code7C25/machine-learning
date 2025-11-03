@@ -185,7 +185,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const createResultCard = (item, categoryInfo = {}) => {
         if (!item) return document.createDocumentFragment();
         const li = document.createElement('li'); li.className = 'result-card';
-        const a = document.createElement('a'); a.href = item.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.className = 'result-card-link';
+        const a = document.createElement('a');
+        a.href = item.url;
+        a.rel = 'noopener noreferrer';
+        a.className = 'result-card-link';
+        a.target = '_blank';
+        a.addEventListener('click', (event) => {
+            event.preventDefault(); // Detiene el comportamiento de enlace HTML
+            
+            // Usamos chrome.tabs.create para abrir la URL
+            chrome.tabs.create({
+                url: item.url,
+                active: false // <--- ESTO ES LA CLAVE: No se activa la nueva pestaña
+        });
+    });
         const img = document.createElement('img'); img.src = item.image_url || 'icons/placeholder.png'; img.alt = item.title; img.className = 'result-image'; img.loading = 'lazy'; a.appendChild(img);
         const textContent = document.createElement('div'); textContent.className = 'result-text-content';
         let categoryHTML = ''; if (categoryInfo.label) { categoryHTML = `<span class="category-badge ${categoryInfo.className}">${categoryInfo.label}</span>`; }
