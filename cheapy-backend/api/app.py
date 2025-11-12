@@ -101,8 +101,23 @@ def get_status(task_id: str):
         # Aplanamos la lista de listas en una sola lista de resultados.
         results_from_worker_group = result_group.get(propagate=False)
         print(f"[API] Resultados recuperados de Redis. {len(results_from_worker_group)} tareas del grupo respondieron.")
+        print(f"[API] Contenido bruto de resultados_from_worker_group: {results_from_worker_group}")
         
         all_results = [item for sublist in results_from_worker_group if sublist for item in sublist]
+        print(f"[API] Total de items después de aplanar: {len(all_results)}")
+
+        # LOG: detectar items con reviews inusualmente grandes o con raw disponible
+        try:
+            for it in all_results:
+                if isinstance(it, dict):
+                    raw = it.get('reviews_count_raw')
+                    parsed = it.get('reviews_count')
+                    if parsed and parsed > 1000000:
+                        print(f"[API] reviews_count grande detectado en item: parsed={parsed} raw={raw!r} title={it.get('title')!r} url={it.get('url')}")
+                    elif raw and 'mil' in str(raw).lower() and (not parsed or parsed > 1000000):
+                        print(f"[API] posible discrepancia raw contiene 'mil' pero parsed grande/absente: parsed={parsed} raw={raw!r} title={it.get('title')!r} url={it.get('url')}")
+        except Exception:
+            pass
 
         # El resto de la lógica de procesamiento no cambia
         final_results = []
@@ -110,11 +125,89 @@ def get_status(task_id: str):
         for item in all_results:
             if isinstance(item, dict):
                 url = item.get("url")
-                if url and url not in seen_urls and isinstance(item.get("price_numeric"), (int, float)):
+                raw_price_numeric = item.get("price_numeric")
+                price_numeric = raw_price_numeric
+                # Asegurar que price_numeric sea numérico: intentar coerción o parseo desde price_display/price
+                if not isinstance(price_numeric, (int, float)):
+                    # Intentar convertir string directamente
+                    try:
+                        price_numeric = float(price_numeric)
+                    except Exception:
+                        price_numeric = None
+                if price_numeric is None:
+                    # Fallback: parsear desde price_display o price si existen
+                    def money_to_float(s: str):
+                        if not s or not isinstance(s, str):
+                            return None
+                        import re as _re
+                        s2 = _re.sub(r"[^\d.,]", "", s)
+                        if "," in s2 and "." in s2:
+                            s2 = s2.replace(".", "").replace(",", ".")
+                        elif "." in s2 and "," not in s2:
+                            parts = s2.split(".")
+                            if len(parts[-1]) == 3 and len(parts) > 1:
+                                s2 = "".join(parts)
+                        elif "," in s2 and "." not in s2:
+                            parts = s2.split(",")
+                            if len(parts[-1]) == 3 and len(parts) > 1:
+                                s2 = "".join(parts)
+                            else:
+                                s2 = s2.replace(",", ".")
+                        try:
+                            return float(s2)
+                        except Exception:
+                            return None
+                    price_numeric = money_to_float(item.get("price_display")) or money_to_float(item.get("price"))
+
+                print(f"[API] Revisando item: url={url}, price_numeric={price_numeric}, type={type(price_numeric)} (raw={raw_price_numeric})")
+                if url and url not in seen_urls and isinstance(price_numeric, (int, float)):
                     seen_urls.add(url)
+                    # Incluir reviews_count_raw explícitamente en respuesta para debug/transparencia
+                    item["price_numeric"] = price_numeric
                     final_results.append(item)
+                else:
+                    print(f"[API] Item filtrado: url={url}, precio_valido={isinstance(price_numeric, (int, float))}, url_duplicada={url in seen_urls if url else 'N/A'}")
         
+        print(f"[API] Items después de filtrado: {len(final_results)} de {len(all_results)}")
+
+        # Centralizar cálculo de 'on_sale' y 'discount_percent' aquí.
+        for it in final_results:
+            try:
+                is_disc = it.get('is_discounted', None)
+                p = it.get('price_numeric')
+                pb = it.get('price_before_numeric')
+
+                if is_disc is True:
+                    # Spider explicitó que está en descuento
+                    it['on_sale'] = True
+                    if pb is not None and p is not None and pb > 0:
+                        try:
+                            it['discount_percent'] = round((pb - p) / pb * 100, 2)
+                        except Exception:
+                            it['discount_percent'] = None
+                    else:
+                        it['discount_percent'] = None
+                elif is_disc is False:
+                    # Spider explicitó que no está en descuento
+                    it['on_sale'] = False
+                    it['discount_percent'] = None
+                else:
+                    # Fallback: inferir por precios si el spider no envió la señal
+                    if pb is not None and p is not None and pb > p * 1.01:
+                        it['on_sale'] = True
+                        try:
+                            it['discount_percent'] = round((pb - p) / pb * 100, 2)
+                        except Exception:
+                            it['discount_percent'] = None
+                    else:
+                        it['on_sale'] = False
+                        it['discount_percent'] = None
+            except Exception as e:
+                print(f"[API] Error calculando descuento para item {it.get('url')}: {e}")
+                it['on_sale'] = False
+                it['discount_percent'] = None
+
         final_results.sort(key=lambda x: (-x.get("reviews_count", 0), x.get("price_numeric", float('inf'))))
-        return {"status": "SUCCESS", "results": final_results}
+        return {"status": "SUCCESS", "results": final_results, "debug_info": {"reviews_count_raw_included": True}}
     else:
         return {"status": "PENDING", "completed": f"{result_group.completed_count()}/{len(result_group)}"}

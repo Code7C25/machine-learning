@@ -1,6 +1,7 @@
 # cheapy-backend/cheapy_scraper/spiders/mercadolibre.py
 
 import scrapy
+import re
 from urllib.parse import urlparse, parse_qs, urlunparse, urlencode 
 from cheapy_scraper.items import ProductItem
 # Se importan las configuraciones centralizadas
@@ -53,7 +54,28 @@ class MercadoLibreSpider(scrapy.Spider):
             item.css('.poly-card__portada img::attr(src)').get()
 
             rating_str = item.css('span.poly-reviews__rating::text, .ui-search-reviews__rating-number::text').get()
-            reviews_count_str = item.css('span.poly-reviews__total::text, .ui-search-reviews__amount::text').get()
+            # Nuevo selector basado en la estructura actual de MercadoLibre
+            # Muchas tarjetas compactas usan el span.poly-component__review-compacted
+            # que contiene dos spans .poly-phrase-label: [rating, "| +50 vendidos"/sales]
+            review_labels = item.css('span.poly-component__review-compacted .poly-phrase-label::text').getall()
+            rating_str = review_labels[0].strip() if len(review_labels) > 0 else None
+            reviews_count_str = review_labels[1].strip() if len(review_labels) > 1 else None
+
+            # Loguear casos sospechosos para ayudar a depuración upstream
+            try:
+                if reviews_count_str:
+                    # Extraer dígitos compactos para revisar magnitude
+                    compact = re.sub(r"[^0-9]", "", reviews_count_str)
+                    if compact:
+                        num = int(compact)
+                        if num > 1000000:
+                            self.logger.warning(f"[mercadolibre spider] reviews_count_str grande extraído: {reviews_count_str!r} title={title!r} url={url!r} page={response.url!r}")
+                    # También reportar casos donde aparece la palabra 'mil' (para comparar)
+                    if 'mil' in reviews_count_str.lower():
+                        self.logger.debug(f"[mercadolibre spider] reviews_count_str contiene 'mil': {reviews_count_str!r} title={title!r} url={url!r}")
+            except Exception:
+                # No queremos que un fallo de logging rompa el spider
+                pass
             
             price_symbol = item.css('.andes-money-amount__currency-symbol::text').get()
             price_fraction = item.css('.andes-money-amount__fraction::text').get()
@@ -64,14 +86,103 @@ class MercadoLibreSpider(scrapy.Spider):
 
             product = ProductItem()
             product['title'] = title
-            product['url'] = url
+            # Normalizamos la URL: removemos query y fragment para evitar duplicados
+            if url:
+                try:
+                    parsed = urlparse(url)
+                    normalized_url = urlunparse(parsed._replace(query='', fragment=''))
+                except Exception:
+                    normalized_url = url
+            else:
+                normalized_url = None
+            product['url'] = normalized_url
             product['image_url'] = image_url
             product['source'] = self.name
             product['price'] = price_full_str if final_price_fraction else None
+            
+            # ========== IMPROVED PRICE BEFORE DETECTION (ROBUST) ==========
+            price_numeric = None
+            price_before = None
+            price_before_numeric = None
+            discount_label_text = None
+            
+            # Extract current price as numeric
+            try:
+                if final_price_fraction:
+                    price_numeric = self.money_to_float(final_price_fraction)
+            except Exception:
+                pass
+            
+            # Try direct selectors for previous price and discount label (more reliable)
+            try:
+                prev_fraction = item.css('s.andes-money-amount--previous .andes-money-amount__fraction::text').get() or \
+                                item.css('s.andes-money-amount .andes-money-amount__fraction::text').get()
+                discount_label_text = item.css('.andes-money-amount__discount::text, .poly-price__disc_label::text').get()
+                if prev_fraction:
+                    price_before = f"{price_symbol or ''}{prev_fraction}"
+                    price_before_numeric = self.money_to_float(prev_fraction)
+            except Exception:
+                pass
+
+            # Collect all monetary text patterns from item container (fallback heuristic)
+            try:
+                money_candidates = item.css('*::text').re(r'[\$€£]\s*[\d\.,]+')
+                money_candidates = [m.strip() for m in money_candidates if m and m.strip()]
+                
+                # Remove duplicates while preserving order
+                unique_money = []
+                for m in money_candidates:
+                    if m not in unique_money:
+                        unique_money.append(m)
+                
+                # Convert all candidates to numeric values
+                money_numeric = []
+                for text in unique_money:
+                    try:
+                        num = self.money_to_float(text)
+                        if num is not None:
+                            money_numeric.append((text, num))
+                    except Exception:
+                        pass
+                
+                # Infer current price if selector missed it
+                if price_numeric is None and money_numeric:
+                    price_numeric = min([n for _, n in money_numeric])
+                    price_full_str = money_numeric[0][0]  # Use first candidate as price text
+                
+                # If direct selector didn't find previous price, detect it heuristically
+                if price_before_numeric is None and price_numeric and len(money_numeric) > 1:
+                    for text, num in money_numeric:
+                        if num > price_numeric * 1.01:  # >1% higher than current
+                            price_before = text
+                            price_before_numeric = num
+                            break
+            except Exception:
+                pass
+            
+            product['price'] = price_full_str if price_numeric else None
+            product['price_before'] = price_before
             product['rating_str'] = rating_str
             product['reviews_count_str'] = reviews_count_str
             product['currency_code'] = self.currency
             product['country_code'] = self.country_code
+
+            # Asignar numerics cuando estén disponibles
+            product['price_numeric'] = price_numeric
+            product['price_before_numeric'] = price_before_numeric
+
+            # Señal genérica: marcar si está en oferta (no calcular % aquí)
+            is_discounted = False
+            try:
+                if discount_label_text:
+                    is_discounted = True
+                elif price_before_numeric is not None and price_numeric is not None:
+                    if price_before_numeric > price_numeric * 1.01:
+                        is_discounted = True
+            except Exception:
+                is_discounted = False
+            product['is_discounted'] = is_discounted
+
             yield product
 
          # --- Lógica de Paginación MODIFICADA (Basada en Offset) ---
@@ -117,3 +228,67 @@ class MercadoLibreSpider(scrapy.Spider):
         for url in self.start_urls:
             # Aseguramos que la primera solicitud también use los headers
             yield scrapy.Request(url, headers=self.custom_headers, callback=self.parse)
+    
+    def money_to_float(self, money_str):
+        """
+        Normalize European (1.234,56) and US (1,234.56) numeric formats to float.
+        Handles currency symbols and common separators.
+        
+        Args:
+            money_str: String like "$1.234,56" or "€1,234.56"
+            
+        Returns:
+            float: Parsed numeric value, or None if parsing fails
+        """
+        if not money_str or not isinstance(money_str, str):
+            return None
+        
+        # Remove currency symbols and whitespace
+        cleaned = re.sub(r'[\$€£\s]', '', money_str.strip())
+        
+        # If no digits found, return None
+        if not re.search(r'\d', cleaned):
+            return None
+        
+        # Separate the last separator from the rest
+        # The last separator (comma or dot) is likely the decimal separator
+        last_sep_pos = max(cleaned.rfind(','), cleaned.rfind('.'))
+        
+        if last_sep_pos == -1:
+            # No separator found, treat as integer
+            try:
+                return float(cleaned)
+            except ValueError:
+                return None
+        
+        # Extract part before and after last separator
+        before_sep = cleaned[:last_sep_pos]
+        after_sep = cleaned[last_sep_pos + 1:]
+        
+        # Determine separator type based on length of decimal part
+        # If after_sep has 2 digits: likely decimal separator
+        # If after_sep has 3+ digits: likely thousands separator (so this is thousands, not decimal)
+        if len(after_sep) == 2:
+            # European format: 1.234,56 → thousands sep is dot, decimal is comma
+            # Clean thousands separators from before_sep
+            thousands_part = before_sep.replace('.', '')
+            try:
+                return float(thousands_part + '.' + after_sep)
+            except ValueError:
+                return None
+        elif len(after_sep) >= 3:
+            # US format: 1,234.56 or 1,234,567 → last sep is thousands
+            # Treat the part after as thousands grouping
+            thousands_part = before_sep.replace(',', '') + after_sep.replace('.', '')
+            try:
+                return float(thousands_part)
+            except ValueError:
+                return None
+        else:
+            # Ambiguous, try to parse as-is
+            try:
+                # Replace common separators
+                normalized = cleaned.replace(',', '.')
+                return float(normalized)
+            except ValueError:
+                return None

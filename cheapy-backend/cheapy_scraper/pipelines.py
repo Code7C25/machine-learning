@@ -46,6 +46,9 @@ class DataCleaningPipeline:
         currency_code = adapter.get('currency_code')
 
         # --- 1. Limpieza de Precio y Moneda (BASADA EN PAÍS) ---
+        # Si price_numeric ya está definido (del spider), NO lo sobrescribimos
+        existing_price_numeric = adapter.get('price_numeric')
+        
         price_str = adapter.get('price')
         if price_str:
             cleaned_str = re.sub(r'[^\d,.]', '', price_str)
@@ -66,9 +69,33 @@ class DataCleaningPipeline:
             except (ValueError, TypeError):
                 adapter['price_numeric'] = None
                 adapter['currency'] = None
+        elif existing_price_numeric is not None:
+            # Si no hay 'price' pero price_numeric ya existe, lo conservamos
+            adapter['currency'] = currency_code
         else:
-             adapter['price_numeric'] = None
-             adapter['currency'] = None
+            adapter['price_numeric'] = None
+            adapter['currency'] = None
+
+        # --- 1.b Procesar precio anterior (si existe) para detectar descuentos ---
+        price_before_str = adapter.get('price_before')
+        if price_before_str:
+            cleaned_before = re.sub(r'[^\d,.]', '', price_before_str)
+            countries_with_comma_decimal = ['AR', 'ES', 'BR', 'DE', 'FR', 'IT']
+            if country_code in countries_with_comma_decimal:
+                cleaned_before = cleaned_before.replace('.', '').replace(',', '.')
+            else:
+                cleaned_before = cleaned_before.replace(',', '')
+            try:
+                adapter['price_before_numeric'] = float(cleaned_before)
+            except (ValueError, TypeError):
+                adapter['price_before_numeric'] = None
+        else:
+            adapter['price_before_numeric'] = None
+
+        # --- 1.c Determinar on_sale/discount_percent será responsabilidad de api/app.py ---
+        # Los spiders marcarán 'is_discounted' (bool). Aquí sólo preservamos
+        # price_numeric y price_before_numeric; app.py centralizará el cálculo
+        # final de 'on_sale' y 'discount_percent' para mantener consistencia.
 
         # --- 2. Limpieza de Rating (no cambia) ---
         rating_str = adapter.get('rating_str')
@@ -83,27 +110,113 @@ class DataCleaningPipeline:
 
         # --- 3. Limpieza de Cantidad de Reseñas (no cambia) ---
         reviews_str = adapter.get('reviews_count_str')
+        # Conservar el valor crudo para depuración/traslado a la API
+        adapter['reviews_count_raw'] = reviews_str
         if reviews_str:
-            cleaned_reviews = reviews_str.replace('(', '').replace(')', '').replace(',', '')
-            num_part = re.findall(r'[\d.]+', cleaned_reviews)
-            if num_part:
-                num_str = num_part[0]
-                multiplier = 1
-                if 'K' in cleaned_reviews.upper(): multiplier = 1000
-                elif 'M' in cleaned_reviews.upper(): multiplier = 1000000
+            # Normalizar y detectar número + sufijo (K/M)
+            orig = reviews_str
+            # Si hay un número explícito entre paréntesis (ej: "(1178)" o "(10000000)"), lo preferimos
+            paren_match = re.search(r'\(([\d\.,]+)\)', orig)
+            if paren_match:
+                par_num = paren_match.group(1)
+                # Normalizar separadores y devolver directamente
+                norm = par_num
+                if '.' in norm and ',' in norm:
+                    norm = norm.replace('.', '').replace(',', '.')
+                elif '.' in norm and ',' not in norm:
+                    parts = norm.split('.')
+                    if len(parts[-1]) == 3:
+                        norm = ''.join(parts)
+                    else:
+                        # No comma present; keep as-is (decimal)
+                        norm = norm
+                elif ',' in norm and '.' not in norm:
+                    parts = norm.split(',')
+                    if len(parts[-1]) == 3:
+                        norm = ''.join(parts)
+                    else:
+                        norm = norm.replace(',', '.')
                 try:
-                    adapter['reviews_count'] = int(float(num_str) * multiplier)
-                except (ValueError, TypeError): adapter['reviews_count'] = 0
+                    adapter['reviews_count'] = int(float(norm))
+                except Exception:
+                    adapter['reviews_count'] = 0
             else:
-                adapter['reviews_count'] = 0
+                # Si la cadena contiene '|' (rating | ventas), preferimos la parte derecha
+                if '|' in orig:
+                    orig = orig.split('|')[-1]
+
+                s = orig.replace('(', '').replace(')', '').replace('+', '').lower()
+                # Eliminar etiquetas frecuentes
+                s = s.replace('vendidos', '').replace('vendido', '').strip()
+
+                # Capturamos sufijos comunes: k, m, mil, millon(es)
+                # Orden importante: buscar primero tokens más largos (millones|millon|mil)
+                m = re.search(r'([\d\.,]+)\s*(millones|millon|mil|k|m)?', s, re.IGNORECASE)
+                if m:
+                    num_str = m.group(1)
+                    suffix_raw = (m.group(2) or '').lower()
+
+                    # Detectar multiplicador por sufijo textual
+                    multiplier = 1
+                    if suffix_raw in ('k', 'mil'):
+                        multiplier = 1000
+                    elif suffix_raw in ('m', 'millon', 'millones'):
+                        multiplier = 1000000
+
+                    # Normalizar separadores:
+                    # - Si hay sufijo (k/mil/million) tratamos '.' o ',' como decimal
+                    #   para que '1.012K' -> 1.012 * 1000 = 1012
+                    norm = num_str
+                    if suffix_raw in ('k', 'mil', 'm', 'millon', 'millones'):
+                        norm = norm.replace(',', '.')
+                    else:
+                        # Heurística para formatos sin sufijo: detectar separador de miles
+                        if '.' in norm and ',' in norm:
+                            norm = norm.replace('.', '').replace(',', '.')
+                        elif '.' in norm and ',' not in norm:
+                            parts = norm.split('.')
+                            if len(parts[-1]) == 3:
+                                norm = ''.join(parts)
+                            else:
+                                norm = norm.replace(',', '.')
+                        elif ',' in norm and '.' not in norm:
+                            parts = norm.split(',')
+                            if len(parts[-1]) == 3:
+                                norm = ''.join(parts)
+                            else:
+                                norm = norm.replace(',', '.')
+
+                    try:
+                        val = float(norm)
+                        adapter['reviews_count'] = int(round(val * multiplier))
+                    except (ValueError, TypeError):
+                        adapter['reviews_count'] = 0
+                    # Loguear casos sospechosos para facilitar depuración (por ejemplo 10_000_000)
+                    try:
+                        if adapter.get('reviews_count', 0) > 1000000:
+                            msg = f"[DataCleaningPipeline] reviews_count grande detectado: raw={reviews_str!r} -> parsed={adapter['reviews_count']} title={adapter.get('title')!r}"
+                            if spider and hasattr(spider, 'logger'):
+                                spider.logger.warning(msg)
+                            else:
+                                # En entornos de test sin spider, imprimimos por consola
+                                print(msg)
+                    except Exception:
+                        # No romper el pipeline por un fallo en logging
+                        pass
+                else:
+                    adapter['reviews_count'] = 0
         else:
             adapter['reviews_count'] = 0
-        
-        # Eliminar campos crudos
+
+        # Antes de eliminar el campo crudo 'price', guardamos una versión para mostrar tal cual
+        adapter['price_display'] = adapter.get('price')
+
+        # Eliminar campos crudos que no queremos en el resultado final
         adapter.pop('price', None)
         adapter.pop('rating_str', None)
         adapter.pop('reviews_count_str', None)
         adapter.pop('currency_code', None)
-        adapter.pop('country_code', None) # <-- Limpiamos el nuevo campo también
-        
+        adapter.pop('country_code', None)
+        # NOTA: conservamos price_before_numeric, price_before, on_sale y discount_percent
+
         return item

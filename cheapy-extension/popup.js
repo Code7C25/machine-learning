@@ -170,10 +170,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceA = a.price_numeric ?? Infinity; const priceB = b.price_numeric ?? Infinity;
             const reviewsA = a.reviews_count ?? 0; const reviewsB = b.reviews_count ?? 0;
             const ratingA = a.rating ?? 0; const ratingB = b.rating ?? 0;
+            const discA = (typeof a.discount_percent === 'number') ? a.discount_percent : (a.price_before_numeric && a.price_numeric ? Math.max(0, ((a.price_before_numeric - a.price_numeric) / a.price_before_numeric) * 100) : 0);
+            const discB = (typeof b.discount_percent === 'number') ? b.discount_percent : (b.price_before_numeric && b.price_numeric ? Math.max(0, ((b.price_before_numeric - b.price_numeric) / b.price_before_numeric) * 100) : 0);
             switch (sortBy) {
                 case 'price_asc': return priceA - priceB;
                 case 'price_desc': return priceB - priceA;
                 case 'reviews': return reviewsB - reviewsA;
+                case 'deal_desc':
+                    // Ordenar primero los que están en oferta y luego por mayor porcentaje de descuento
+                    if ((b.on_sale === true) !== (a.on_sale === true)) {
+                        return (b.on_sale === true) ? 1 : -1;
+                    }
+                    return (discB || 0) - (discA || 0);
                 case 'relevance': default:
                     if (ratingB !== ratingA) { return ratingB - ratingA; }
                     return reviewsB - reviewsA;
@@ -197,14 +205,33 @@ document.addEventListener('DOMContentLoaded', () => {
             chrome.tabs.create({
                 url: item.url,
                 active: false // <--- ESTO ES LA CLAVE: No se activa la nueva pestaña
+            });
         });
-    });
         const img = document.createElement('img'); img.src = item.image_url || 'icons/placeholder.png'; img.alt = item.title; img.className = 'result-image'; img.loading = 'lazy'; a.appendChild(img);
         const textContent = document.createElement('div'); textContent.className = 'result-text-content';
         let categoryHTML = ''; if (categoryInfo.label) { categoryHTML = `<span class="category-badge ${categoryInfo.className}">${categoryInfo.label}</span>`; }
-        const formattedPrice = item.price_numeric ? new Intl.NumberFormat(undefined, { style: 'currency', currency: item.currency || 'USD' }).format(item.price_numeric) : 'Precio no disponible';
+        
+        // Formatear precio numérico y obtener precio crudo si está disponible
+        const formattedPriceNumeric = item.price_numeric ? new Intl.NumberFormat(undefined, { style: 'currency', currency: item.currency || 'USD' }).format(item.price_numeric) : null;
+    // Prefer the cleaned/display price from backend if available
+    const rawPrice = item.price_display ? String(item.price_display).trim() : (item.price ? String(item.price).trim() : null);
+
+        // Construir HTML para precio. Si está en oferta y el spider nos dio el precio crudo, usamos ese texto
+        let priceHTML = '';
+        if (item.on_sale && rawPrice) {
+            const discountPercent = item.discount_percent ? Math.round(item.discount_percent) : null;
+            priceHTML = `<span class="item-price on-sale">${rawPrice}</span>`;
+            if (discountPercent !== null) {
+                priceHTML += `<span class="discount-badge">-${discountPercent}%</span>`;
+            }
+        } else if (formattedPriceNumeric) {
+            priceHTML = `<span class="item-price">${formattedPriceNumeric}</span>`;
+        } else {
+            priceHTML = `<span class="item-price">Precio no disponible</span>`;
+        }
+        
         const reviewsText = item.reviews_count > 0 ? `⭐ ${item.rating || '?'} (${item.reviews_count})` : 'Sin reseñas';
-        textContent.innerHTML = `${categoryHTML}<span class="item-title">${item.title || 'Título no disponible'}</span><div class="item-details"><span class="item-price">${formattedPrice}</span><span class="store-name">${item.source || 'Tienda'}</span></div><span class="item-reviews">${reviewsText}</span>`;
+    textContent.innerHTML = `${categoryHTML}<span class="item-title">${item.title || 'Título no disponible'}</span><div class="item-details">${priceHTML}<span class="store-name">${item.source || 'Tienda'}</span></div><span class="item-reviews">${reviewsText}</span>`;
         a.appendChild(textContent); li.appendChild(a); return li;
     };
 
