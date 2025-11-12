@@ -6,6 +6,7 @@ class FravegaSpider(scrapy.Spider):
     name = "fravega"
 
     # No se necesita Playwright.
+    MAX_PAGES = 2  # Límite de páginas a recorrer
     
     def __init__(self, query="", country="AR", **kwargs):
         super().__init__(**kwargs)
@@ -16,9 +17,13 @@ class FravegaSpider(scrapy.Spider):
         self.country_code = "AR"
         self.currency = COUNTRY_CURRENCIES.get(self.country_code)
         self.start_urls = [f"https://www.fravega.com/l/?keyword={self.query.replace(' ', '%20')}"]
+        self.page_count = 0
         self.logger.info(f"Iniciando Fravega spider para query: '{self.query}'")
 
     def parse(self, response):
+        # Contador de páginas para respetar MAX_PAGES
+        self.page_count += 1
+        self.logger.info(f"Parseando página {self.page_count}/{self.MAX_PAGES} - {response.url}")
         # Selector para el contenedor principal de cada producto
         products = response.css('article[data-test-id="result-item"]')
         self.logger.info(f"Se encontraron {len(products)} productos en la página de Fravega.")
@@ -218,3 +223,39 @@ class FravegaSpider(scrapy.Spider):
                 'currency_code': self.currency,
                 'country_code': self.country_code,
             }
+
+        # --- Paginación Frávega ---
+        # Buscar botón/enlace de siguiente página; ejemplos dados: a[data-type="next"], a[data-test-id="pagination-next-button"]
+        try:
+            next_href = response.css(
+                'a[data-type="next"]::attr(href), a[data-test-id="pagination-next-button"]::attr(href), a[rel="next"]::attr(href)'
+            ).get()
+            if next_href and next_href.strip():
+                next_url = response.urljoin(next_href.strip())
+                if self.page_count < self.MAX_PAGES:
+                    self.logger.info(f"Siguiente página Fravega detectada: {next_url}")
+                    yield scrapy.Request(next_url, callback=self.parse)
+                else:
+                    self.logger.info("Máximo de páginas alcanzado en Fravega.")
+        except Exception as e:
+            self.logger.debug(f"No se pudo resolver el enlace de siguiente página en Fravega: {e}")
+
+    # ===================== Helper opcional de paginación (para tests) =====================
+    def _compute_next_fravega_url(self, current_url: str) -> str | None:
+        """
+        Incrementa el parámetro page=N en la URL si existe, o lo añade con page=2.
+        """
+        try:
+            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+            parsed = urlparse(current_url)
+            q = parse_qs(parsed.query)
+            cur = 1
+            try:
+                cur = int(q.get('page', ['1'])[0])
+            except Exception:
+                cur = 1
+            q['page'] = [str(cur + 1)]
+            new_query = urlencode(q, doseq=True)
+            return urlunparse(parsed._replace(query=new_query))
+        except Exception:
+            return None

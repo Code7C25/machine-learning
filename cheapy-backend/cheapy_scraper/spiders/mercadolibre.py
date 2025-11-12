@@ -10,7 +10,8 @@ from config import MERCADOLIBRE_DOMAINS, COUNTRY_CURRENCIES
 class MercadoLibreSpider(scrapy.Spider):
     name = "mercadolibre"
     MAX_PAGES = 2
-    ITEMS_PER_PAGE = 48 # Número típico de ítems por página en MercadoLibre
+    # MercadoLibre suele paginar en saltos de 50 (ej.: _Desde_51, _Desde_101, ...)
+    ITEMS_PER_PAGE = 50
     
     # El diccionario 'meli_domains' se ha movido a config.py
     
@@ -185,44 +186,21 @@ class MercadoLibreSpider(scrapy.Spider):
 
             yield product
 
-         # --- Lógica de Paginación MODIFICADA (Basada en Offset) ---
+        # --- Paginación: primero intenta seguir el botón "Siguiente", luego fallback por patrón _Desde_ ---
         if self.page_count < self.MAX_PAGES:
-            
-            parsed_url = urlparse(response.url)
-            query_params = parse_qs(parsed_url.query)
-            
-            # 1. Determinar el desplazamiento actual
-            # ML usa _Desde. Si no está, asumimos que estamos en el inicio (offset 0).
-            # parse_qs devuelve listas, por eso usamos [0]
-            current_offset_str = query_params.get('_Desde', ['0'])[0]
-            
-            try:
-                current_offset = int(current_offset_str)
-            except ValueError:
-                # Si el valor no es un número (ej: está vacío), empezamos desde 0
-                current_offset = 0 
-                
-            # 2. Calcular el nuevo desplazamiento
-            new_offset = current_offset + self.ITEMS_PER_PAGE
-            
-            # 3. Reemplazar o añadir el nuevo parámetro _Desde
-            query_params['_Desde'] = [str(new_offset)]
+            next_url = self._extract_next_link(response)
+            if not next_url:
+                next_url = self._compute_next_meli_url(response.url)
 
-            # 4. Reconstruir la URL
-            # urlencode convierte el diccionario de parámetros de nuevo en una cadena de consulta
-            new_query = urlencode(query_params, doseq=True)
-            
-            # urlunparse reconstruye la URL con la nueva cadena de consulta
-            next_page_url = urlunparse(parsed_url._replace(query=new_query, fragment=''))
-            
-            self.logger.info(f"Calculado: Próxima URL de búsqueda con offset: {new_offset}")
-
-            # 5. Yield la nueva solicitud
-            yield scrapy.Request(
-                url=next_page_url, 
-                headers=self.custom_headers, # ¡Asegúrate de pasar los headers aquí!
-                callback=self.parse
-            )
+            if next_url:
+                self.logger.info(f"Siguiente página detectada: {next_url}")
+                yield scrapy.Request(
+                    url=next_url,
+                    headers=self.custom_headers,
+                    callback=self.parse,
+                )
+            else:
+                self.logger.info("No se encontró enlace de 'Siguiente' ni se pudo calcular siguiente URL.")
 
     def start_requests(self):
         for url in self.start_urls:
@@ -292,3 +270,58 @@ class MercadoLibreSpider(scrapy.Spider):
                 return float(normalized)
             except ValueError:
                 return None
+
+    # ===================== Helpers de paginación MercadoLibre =====================
+    def _extract_next_link(self, response) -> str | None:
+        """
+        Busca el enlace 'Siguiente' en la paginación de MercadoLibre y devuelve la URL absoluta.
+        """
+        try:
+            href = response.css(
+                'li.andes-pagination__button.andes-pagination__button--next a::attr(href), '
+                'a.andes-pagination__link[title="Siguiente"]::attr(href)'
+            ).get()
+            if href and href.strip():
+                return response.urljoin(href.strip())
+        except Exception:
+            pass
+        return None
+
+    def _compute_next_meli_url(self, current_url: str) -> str | None:
+        """
+        Fallback cuando no hay enlace 'Siguiente':
+        - Si la URL contiene patrón en PATH tipo *_Desde_51*, incrementa por ITEMS_PER_PAGE.
+        - Si no lo contiene, agrega *_Desde_{ITEMS_PER_PAGE+1}_NoIndex_True* al final del slug.
+        - Como último recurso, añade query _Desde=... (algunos listados lo aceptan).
+        """
+        try:
+            parsed = urlparse(current_url)
+            path = parsed.path or ''
+
+            # Caso 1: patrón en el path
+            m = re.search(r"(_Desde_)(\d+)", path)
+            if m:
+                prefix, num = m.group(1), int(m.group(2))
+                new_num = num + self.ITEMS_PER_PAGE
+                new_path = re.sub(r"(_Desde_)\d+", f"{prefix}{new_num}", path)
+                return urlunparse(parsed._replace(path=new_path, query='', fragment=''))
+
+            # Caso 2: no tiene _Desde_ en path. Agregarlo al final del último segmento del slug
+            # Ej.: /electronica-audio-video/televisores/tv -> /.../tv_Desde_51_NoIndex_True
+            if path and not path.endswith('/'):
+                start = self.ITEMS_PER_PAGE + 1  # 51 si ITEMS_PER_PAGE=50
+                new_path = f"{path}_Desde_{start}_NoIndex_True"
+                return urlunparse(parsed._replace(path=new_path, query='', fragment=''))
+
+            # Caso 3: query param como último recurso
+            q = parse_qs(parsed.query)
+            cur = 0
+            try:
+                cur = int(q.get('_Desde', ['0'])[0])
+            except Exception:
+                cur = 0
+            q['_Desde'] = [str(cur + self.ITEMS_PER_PAGE)]
+            new_query = urlencode(q, doseq=True)
+            return urlunparse(parsed._replace(query=new_query, fragment=''))
+        except Exception:
+            return None
