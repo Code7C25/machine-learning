@@ -1,0 +1,72 @@
+{
+  "name": "MercadoLibre",
+  "domain_map": {
+    "AR": "com.ar",
+    "BR": "com.br",
+    "MX": "com.mx",
+    "CO": "com.co",
+    "CL": "cl",
+    "UY": "com.uy",
+    "PE": "com.pe",
+    "CR": "co.cr",
+    "PA": "com.pa",
+    "EC": "com.ec",
+    "VE": "com.ve",
+    "PY": "com.py",
+    "BO": "com.bo",
+    "DO": "com.do",
+    "GT": "com.gt",
+    "HN": "com.hn",
+    "NI": "com.ni",
+    "SV": "com.sv",
+    "CU": "com.cu"
+  },
+  "search_base_url_template": "https://listado.mercadolibre.{domain}/{query_slug}",
+  "query_space_separator": "-",
+  "pagination_param": "_Desde",
+  "items_per_page": 48,
+  "max_pages": 3, 
+  "requires_playwright": true, 
+  "playwright_page_goto_kwargs": {
+    "wait_until": "domcontentloaded", 
+    "timeout": 60000 
+  },
+  "playwright_page_methods": [
+    ["wait_for_selector", "li.ui-search-layout__item", {"timeout": 10000}], 
+    ["wait_for_timeout", 2000]
+  ],
+  "item_selectors": {
+    "container": "li.ui-search-layout__item",
+    "title": "a.poly-component__title::text, h2.ui-search-item__title::text",
+    "url": "a.poly-component__title::attr(href), a.ui-search-link::attr(href)",
+    "image_url": ".ui-search-result__image-container img::attr(data-src), .ui-search-result__image-container img::attr(src), .poly-card__portada img::attr(data-src), .poly-card__portada img::attr(src)",
+    "price_fraction": ".andes-money-amount__fraction::text",
+    "price_fraction_discount": "div.poly-price__current .andes-money-amount__fraction::text",
+    "price_fraction_normal": ".ui-search-price .andes-money-amount__fraction::text",
+    "rating_str": "span.poly-component__review-compacted::attr(aria-label)",
+    "reviews_count_str": "span.poly-component__review-compacted::attr(aria-label)"
+  },
+  "currency_map": {
+    "AR": "ARS",
+    "BR": "BRL",
+    "MX": "MXN",
+    "CO": "COP",
+    "CL": "CLP",
+    "UY": "UYU",
+    "PE": "PEN",
+    "CR": "CRC",
+    "PA": "PAB",
+    "EC": "USD",
+    "VE": "VES",
+    "PY": "PYG",
+    "BO": "BOB",
+    "DO": "DOP",
+    "GT": "GTQ",
+    "HN": "HNL",
+    "NI": "NIO",
+    "SV": "USD",
+    "CU": "CUP",
+    "PR": "USD",
+    "GLOBAL": "USD"
+  }
+}

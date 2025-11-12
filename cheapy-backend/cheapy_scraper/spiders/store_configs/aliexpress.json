@@ -1,0 +1,43 @@
+{
+  "name": "AliExpress",
+  "domain_map": {
+    "ES": "es.aliexpress.com",
+    "FR": "fr.aliexpress.com",
+    "DE": "de.aliexpress.com",
+    "IT": "it.aliexpress.com",
+    "BR": "pt.aliexpress.com",
+    "US": "www.aliexpress.com",
+    "GLOBAL": "www.aliexpress.com"
+  },
+  "search_base_url_template": "https://{domain}/wholesale?SearchText={query_slug}&page={page_num}",
+  "query_space_separator": "+",
+  "search_query_param_name": "SearchText",
+  "pagination_param": "page",
+  "items_per_page": 60,
+  "max_pages": 2,
+  "requires_playwright": true,
+  "playwright_page_methods": [
+    ["wait_for_timeout", 2000],
+    ["evaluate", "window.scrollTo(0, document.body.scrollHeight)"],
+    ["wait_for_timeout", 1000]
+  ],
+  "item_selectors": {
+    "container": "div[data-spm=\"product_list\"], div.man-pc-search-item-card",
+    "title": "a.man-pc-search-item-card__title::text, div.man-pc-search-item-card__title::text, h1::text",
+    "url": "a.man-pc-search-item-card__title::attr(href), a::attr(href)",
+    "image_url": "img.man-pc-search-item-card__thumbnail-img::attr(src), img.multi--image--w2T9S9U::attr(src)",
+    "price_current": "div.man-pc-search-item-card__price-current::text, .price-current::text",
+    "rating_str": ".man-pc-search-item-card__star-level::text",
+    "reviews_count_str": ".man-pc-search-item-card__feedback::text"
+  },
+  "currency_map": {
+    "GLOBAL": "USD",
+    "AR": "ARS",
+    "US": "USD",
+    "ES": "EUR",
+    "FR": "EUR",
+    "DE": "EUR",
+    "IT": "EUR",
+    "BR": "BRL"
+  }
+}

@@ -1,0 +1,26 @@
+{
+    "name": "ebay",
+    "base_url": "https://www.ebay.com/sch/i.html?_nkw={query}",
+    "country_urls": {
+        "US": "https://www.ebay.com/sch/i.html?_nkw={query}",
+        "UK": "https://www.ebay.co.uk/sch/i.html?_nkw={query}",
+        "AU": "https://www.ebay.com.au/sch/i.html?_nkw={query}"
+    },
+    "selectors": {
+        "product_list": "ul.srp-results li.s-item",
+        "product": {
+            "title": "div.s-item__title span::text",
+            "price": "span.s-item__price::text",
+            "url": "a.s-item__link::attr(href)",
+            "image": "img.s-item__image-img::attr(src)",
+            "condition": "span.SECONDARY_INFO::text",
+            "shipping": "span.s-item__shipping::text",
+            "location": "span.s-item__location::text"
+        },
+        "next_page": "a.pagination__next::attr(href)"
+    },
+    "required_fields": ["title", "price", "url"],
+    "dynamic_loading": false,
+    "max_pages": 3,
+    "delay": 2.5
+}

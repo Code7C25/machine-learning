@@ -1,0 +1,49 @@
+{
+  "name": "Amazon",
+  "domain_map": {
+    "US": "com",
+    "CA": "ca",
+    "MX": "com.mx",
+    "BR": "com.br",
+    "ES": "es",
+    "GB": "co.uk",
+    "DE": "de",
+    "FR": "fr",
+    "IT": "it",
+    "JP": "co.jp",
+    "AU": "com.au",
+    "CN": "cn",
+    "GLOBAL": "com"
+  },
+ "search_base_url_template": "https://www.amazon.{domain}/s?k={query_slug}&page={page_num}",
+  "query_space_separator": "+",
+  "search_query_param_name": "k",
+  "pagination_param": "page",
+  "items_per_page": 16,
+  "max_pages": 2,
+  "requires_playwright": false,
+  "item_selectors": {
+    "container": "div[data-component-type=\"s-search-result\"]",
+    "title": "h2 a.a-link-normal span.a-text-normal::text",
+    "url": "h2 a.a-link-normal::attr(href)",
+    "image_url": "img.s-image::attr(src)",
+    "price_current": "span.a-price span.a-offscreen::text",
+    "rating_str": "div.a-row.a-size-small span.a-icon-alt::text",
+    "reviews_count_str": "div.a-row.a-size-small span.a-size-base::text"
+  },
+  "currency_map": {
+    "US": "USD",
+    "CA": "CAD",
+    "MX": "MXN",
+    "BR": "BRL",
+    "ES": "EUR",
+    "GB": "GBP",
+    "DE": "EUR",
+    "FR": "EUR",
+    "IT": "EUR",
+    "JP": "JPY",
+    "AU": "AUD",
+    "CN": "CNY",
+    "GLOBAL": "USD"
+  }
+}

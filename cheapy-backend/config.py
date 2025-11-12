@@ -40,17 +40,12 @@ ALIEXPRESS_DOMAINS = {
 # --- Cerebro del Despachador ---
 # Mapeo de país a una lista de spiders que se ejecutarán para ese país.
 COUNTRY_TO_SPIDERS = {
-    # LATAM
-    'AR': ['mercadolibre','fravega'],
-    'CO': ['mercadolibre'],
-    'CL': ['mercadolibre'],
-    
-    # Países con Múltiples Tiendas
-    'MX': ['mercadolibre', 'amazon'],
-    'BR': ['mercadolibre', 'amazon', 'aliexpress'],
-    'US': ['amazon', 'ebay', 'aliexpress'],
-    'CA': ['amazon', 'ebay'],
-    'ES': ['amazon', 'ebay', 'aliexpress'],
-    
-    # Por defecto, si un país no está aquí, no se ejecutará ningún spider.
+    'AR': ['mercadolibre','fravega', 'megatone'],
+    'US': ['amazon', 'ebay', 'aliexpress'], # <-- Añadido 'amazon' aquí
+    'MX': ['mercadolibre', 'amazon', 'ebay', 'aliexpress'], # <-- Añadido 'amazon' aquí
+    'BR': ['mercadolibre', 'amazon', 'aliexpress'], # <-- Añadido 'amazon' aquí
+    'CO': ['mercadolibre', 'amazon', 'aliexpress'], # <-- Añadido 'amazon' aquí
+    'CL': ['mercadolibre', 'amazon', 'aliexpress'], # <-- Añadido 'amazon' aquí
+    'ES': ['amazon', 'ebay', 'aliexpress'], # <-- Añadido 'amazon' aquí
+    "GLOBAL": ["aliexpress", "amazon"] # <-- Añadido 'amazon' aquí como global
 }

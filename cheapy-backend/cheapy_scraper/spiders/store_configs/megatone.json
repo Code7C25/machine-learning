@@ -1,0 +1,34 @@
+{
+  "name": "Megatone",
+  "domain_map": {
+    "AR": "net"
+  },
+  "search_base_url_template": "https://www.megatone.{domain}/resultados-busqueda?q={query_slug}",
+  "query_space_separator": "+",
+  "search_query_param_name": "q",
+  "pagination_param": "page",
+  "items_per_page": 24,
+  "max_pages": 2,
+  "requires_playwright": true,
+  "playwright_page_goto_kwargs": {
+    "wait_until": "domcontentloaded",
+    "timeout": 60000
+  },
+  "playwright_page_methods": [
+    ["wait_for_selector", "a.producto", {"timeout": 15000}],
+    ["wait_for_timeout", 3000]
+  ],
+  "item_selectors": {
+    "container": "a.producto",
+    "title": "div.detalles > div.nombre > h3::text",
+    "url": "::attr(href)",
+    "image_url": "div.imagen > img::attr(src)",
+    "price_current": "div.precios.sin-descuento > div.lista::text",
+    "rating_str": null,
+    "reviews_count_str": null
+  },
+  "currency_map": {
+    "AR": "ARS",
+    "GLOBAL": "USD"
+  }
+}

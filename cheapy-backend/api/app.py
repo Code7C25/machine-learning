@@ -82,7 +82,10 @@ def buscar_producto(q: str, request: Request, country: str = None):
     print(f"API: Tarea recibida para '{q}' en '{country_code}'. Spiders: {spiders_to_run}")
 
     task_signatures = [
-        celery_app.signature('run_scrapy_spider_task', kwargs={'spider_name': name, 'query': q, 'country': country_code})
+        celery_app.signature(
+            'run_scrapy_spider_task', 
+            kwargs={'store_name': name, 'query': q, 'country': country_code} # <-- ¡CAMBIO AQUÍ!
+        )
         for name in spiders_to_run
     ]
     result_group = group(task_signatures).apply_async()

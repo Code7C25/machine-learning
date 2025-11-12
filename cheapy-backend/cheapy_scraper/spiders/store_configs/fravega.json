@@ -1,0 +1,25 @@
+{
+  "name": "Fravega",
+  "domain_map": {
+    "AR": "com.ar"
+  },
+  "search_base_url_template": "https://www.fravega.{domain}/l?keyword={query_slug}",
+  "query_space_separator": "%20",
+  "pagination_param": "page",
+  "items_per_page": 24,
+  "max_pages": 3,
+  "requires_playwright": false,
+  "item_selectors": {
+    "container": "li.sc-ixPHmS",
+    "title": "span[data-test-id=\"product-title\"]::text",
+    "url": ":scope > a::attr(href)",
+    "image_url": "figure.sc-bAwCGc > picture:first-of-type > source[type=\"image/webp\"]::attr(srcset)",
+    "price_current": "div[data-test-id=\"product-price\"] span.sc-hcFBEE::text",
+    "rating_str": null,
+    "reviews_count_str": null
+  },
+  "currency_map": {
+    "AR": "ARS",
+    "GLOBAL": "USD"
+  }
+}

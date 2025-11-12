@@ -59,7 +59,6 @@ class DataCleaningPipeline:
             else:
                 # Formato por defecto (US, MX, UK, etc.): 1,234.56 -> Quitar comas
                 cleaned_str = cleaned_str.replace(',', '')
-            
             try:
                 adapter['price_numeric'] = float(cleaned_str)
                 adapter['currency'] = currency_code
@@ -70,32 +69,65 @@ class DataCleaningPipeline:
              adapter['price_numeric'] = None
              adapter['currency'] = None
 
-        # --- 2. Limpieza de Rating (no cambia) ---
+          # --- 2. Limpieza de Rating (ACTUALIZADO para MercadoLibre aria-label) ---
         rating_str = adapter.get('rating_str')
         if rating_str:
-            try:
-                numeric_part = rating_str.split(' ')[0]
-                adapter['rating'] = float(numeric_part.replace(',', '.'))
-            except (ValueError, TypeError):
-                adapter['rating'] = 0.0
+            # Detecta si es el formato de MercadoLibre con "Calificación X.X de 5 estrellas"
+            if "Calificación" in rating_str and "estrellas" in rating_str:
+                match = re.search(r'Calificación ([\d.]+)', rating_str)
+                if match:
+                    try:
+                        adapter['rating'] = float(match.group(1))
+                    except (ValueError, TypeError):
+                        adapter['rating'] = 0.0
+                else:
+                    adapter['rating'] = 0.0
+            else: # Tu lógica existente para otros formatos de rating_str
+                try:
+                    numeric_part = rating_str.split(' ')[0]
+                    adapter['rating'] = float(numeric_part.replace(',', '.'))
+                except (ValueError, TypeError):
+                    adapter['rating'] = 0.0
         else:
             adapter['rating'] = 0.0
 
-        # --- 3. Limpieza de Cantidad de Reseñas (no cambia) ---
-        reviews_str = adapter.get('reviews_count_str')
+        # --- 3. Limpieza de Cantidad de Reseñas (ACTUALIZADO para MercadoLibre aria-label) ---
+        reviews_str = adapter.get('reviews_count_str') # Esto recibirá el mismo aria-label
         if reviews_str:
-            cleaned_reviews = reviews_str.replace('(', '').replace(')', '').replace(',', '')
-            num_part = re.findall(r'[\d.]+', cleaned_reviews)
-            if num_part:
-                num_str = num_part[0]
-                multiplier = 1
-                if 'K' in cleaned_reviews.upper(): multiplier = 1000
-                elif 'M' in cleaned_reviews.upper(): multiplier = 1000000
-                try:
-                    adapter['reviews_count'] = int(float(num_str) * multiplier)
-                except (ValueError, TypeError): adapter['reviews_count'] = 0
-            else:
-                adapter['reviews_count'] = 0
+            # Detecta si es el formato de MercadoLibre con "Más de X productos vendidos." o "Y opiniones"
+            if "vendidos" in reviews_str:
+                match = re.search(r'Más de ([\d.]+) productos vendidos', reviews_str)
+                if match:
+                    try:
+                        # Asume que "Más de 1000" significa 1000, "Más de 500" significa 500
+                        num_part = float(match.group(1)) 
+                        adapter['reviews_count'] = int(num_part)
+                    except (ValueError, TypeError):
+                        adapter['reviews_count'] = 0
+                else: # Si no es "Más de X vendidos", podría ser el conteo de opiniones directo.
+                    # Aquí podemos intentar buscar "(X opiniones)" como un fallback.
+                    opinions_match = re.search(r'\((\d+)\s*(opiniones|reseñas)\)', reviews_str)
+                    if opinions_match:
+                        try:
+                            adapter['reviews_count'] = int(opinions_match.group(1))
+                        except (ValueError, TypeError):
+                            adapter['reviews_count'] = 0
+                    else:
+                        adapter['reviews_count'] = 0 # No se encontró un patrón claro
+            else: # Tu lógica existente para otros formatos de reviews_count_str
+                cleaned_reviews = reviews_str.replace('(', '').replace(')', '').replace(',', '').strip()
+                num_part_match = re.search(r'([\d.]+)\s*(K|k|M|m)?', cleaned_reviews)
+                if num_part_match:
+                    num_str = num_part_match.group(1)
+                    multiplier_char = num_part_match.group(2)
+                    multiplier = 1
+                    if multiplier_char and multiplier_char.upper() == 'K': multiplier = 1000
+                    elif multiplier_char and multiplier_char.upper() == 'M': multiplier = 1000000
+                    try:
+                        adapter['reviews_count'] = int(float(num_str) * multiplier)
+                    except (ValueError, TypeError): adapter['reviews_count'] = 0
+                else:
+                    adapter['reviews_count'] = 0
         else:
             adapter['reviews_count'] = 0
         
