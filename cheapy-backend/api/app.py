@@ -1,6 +1,7 @@
 import httpx
 import time
 import sqlite3
+import logging
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,8 @@ from config import COUNTRY_TO_SPIDERS
 
 # --- CONFIGURACIÓN ---
 app = FastAPI(title="Cheapy Scraper API - Async")
+logger = logging.getLogger("cheapy.api")
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s %(name)s: %(message)s")
 BASE_DIR = Path(__file__).resolve().parent.parent
 CACHE_DB_FILE = BASE_DIR / "cache.db"
 CACHE_DURATION_SECONDS = 86400
@@ -28,7 +31,7 @@ setup_cache_database()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # --- FUNCIÓN DE GEOLOCALIZACIÓN ---
-def get_country_from_ip(ip: str) -> str:
+async def get_country_from_ip(ip: str) -> str:
     default_country = "AR"
     conn = sqlite3.connect(CACHE_DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
@@ -36,9 +39,10 @@ def get_country_from_ip(ip: str) -> str:
         cursor.execute("SELECT country, timestamp FROM ip_cache WHERE ip = ?", (ip,))
         result = cursor.fetchone()
         if result and (time.time() - result[1] < CACHE_DURATION_SECONDS): return result[0]
-        response = httpx.get("https://ipapi.co/json/", timeout=3.0)
-        response.raise_for_status()
-        data = response.json()
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.get("https://ipapi.co/json/")
+            response.raise_for_status()
+            data = response.json()
         country_code = data.get("country_code")
         if country_code:
             country_code = country_code.upper()
@@ -52,7 +56,7 @@ def get_country_from_ip(ip: str) -> str:
 # --- ENDPOINTS (MODIFICADOS) ---
 
 @app.get("/buscar")
-def buscar_producto(q: str, request: Request, country: str = None):
+async def buscar_producto(q: str, request: Request, country: str = None):
     """
     Busca un producto. Prioriza el país enviado por el cliente.
     Si no se envía, usa geolocalización por IP como fallback.
@@ -64,22 +68,22 @@ def buscar_producto(q: str, request: Request, country: str = None):
     if country:
         # Si el frontend envía un país, lo usamos.
         country_code = country.upper()
-        print(f"API: País '{country_code}' recibido del frontend.")
+        logger.info(f"País recibido del frontend: %s", country_code)
     else:
         # Si no, usamos la geolocalización del backend como fallback.
-        print("API: No se recibió país del frontend. Usando geolocalización por IP...")
+        logger.info("No se recibió país; usando geolocalización por IP")
         client_ip = request.client.host
-        country_code = get_country_from_ip(client_ip)
+        country_code = await get_country_from_ip(client_ip)
     
     # --- MODO DE PRUEBA (OPCIONAL) ---
     # Para forzar un país durante el desarrollo, puedes sobreescribir la variable aquí.
-    #country_code = "MX"
+    # country_code = "US"
     
     spiders_to_run = COUNTRY_TO_SPIDERS.get(country_code, [])
     if not spiders_to_run:
         return {"task_id": None, "error": f"No hay tiendas para tu región ({country_code})."}
 
-    print(f"API: Tarea recibida para '{q}' en '{country_code}'. Spiders: {spiders_to_run}")
+    logger.info("Tarea recibida q=%r country=%s spiders=%s", q, country_code, spiders_to_run)
 
     task_signatures = [
         celery_app.signature('run_scrapy_spider_task', kwargs={'spider_name': name, 'query': q, 'country': country_code})
@@ -100,11 +104,11 @@ def get_status(task_id: str):
         # --- ¡CORRECCIÓN IMPORTANTE AQUÍ! ---
         # Aplanamos la lista de listas en una sola lista de resultados.
         results_from_worker_group = result_group.get(propagate=False)
-        print(f"[API] Resultados recuperados de Redis. {len(results_from_worker_group)} tareas del grupo respondieron.")
-        print(f"[API] Contenido bruto de resultados_from_worker_group: {results_from_worker_group}")
+        logger.info("Resultados recuperados de Redis: %d tareas respondieron", len(results_from_worker_group))
+        logger.debug("Contenido bruto de resultados_from_worker_group: %s", results_from_worker_group)
         
         all_results = [item for sublist in results_from_worker_group if sublist for item in sublist]
-        print(f"[API] Total de items después de aplanar: {len(all_results)}")
+        logger.info("Total de items después de aplanar: %d", len(all_results))
 
         # LOG: detectar items con reviews inusualmente grandes o con raw disponible
         try:
@@ -113,9 +117,9 @@ def get_status(task_id: str):
                     raw = it.get('reviews_count_raw')
                     parsed = it.get('reviews_count')
                     if parsed and parsed > 1000000:
-                        print(f"[API] reviews_count grande detectado en item: parsed={parsed} raw={raw!r} title={it.get('title')!r} url={it.get('url')}")
+                        logger.warning("reviews_count grande detectado: parsed=%s raw=%r title=%r url=%s", parsed, raw, it.get('title'), it.get('url'))
                     elif raw and 'mil' in str(raw).lower() and (not parsed or parsed > 1000000):
-                        print(f"[API] posible discrepancia raw contiene 'mil' pero parsed grande/absente: parsed={parsed} raw={raw!r} title={it.get('title')!r} url={it.get('url')}")
+                        logger.warning("posible discrepancia reviews: parsed=%s raw=%r title=%r url=%s", parsed, raw, it.get('title'), it.get('url'))
         except Exception:
             pass
 
@@ -159,16 +163,16 @@ def get_status(task_id: str):
                             return None
                     price_numeric = money_to_float(item.get("price_display")) or money_to_float(item.get("price"))
 
-                print(f"[API] Revisando item: url={url}, price_numeric={price_numeric}, type={type(price_numeric)} (raw={raw_price_numeric})")
+                logger.debug("Revisando item url=%s price_numeric=%s type=%s (raw=%s)", url, price_numeric, type(price_numeric), raw_price_numeric)
                 if url and url not in seen_urls and isinstance(price_numeric, (int, float)):
                     seen_urls.add(url)
                     # Incluir reviews_count_raw explícitamente en respuesta para debug/transparencia
                     item["price_numeric"] = price_numeric
                     final_results.append(item)
                 else:
-                    print(f"[API] Item filtrado: url={url}, precio_valido={isinstance(price_numeric, (int, float))}, url_duplicada={url in seen_urls if url else 'N/A'}")
+                    logger.debug("Item filtrado url=%s precio_valido=%s url_duplicada=%s", url, isinstance(price_numeric, (int, float)), (url in seen_urls if url else 'N/A'))
         
-        print(f"[API] Items después de filtrado: {len(final_results)} de {len(all_results)}")
+        logger.info("Items después de filtrado: %d de %d", len(final_results), len(all_results))
 
         # Centralizar cálculo de 'on_sale' y 'discount_percent' aquí.
         for it in final_results:
@@ -203,7 +207,7 @@ def get_status(task_id: str):
                         it['on_sale'] = False
                         it['discount_percent'] = None
             except Exception as e:
-                print(f"[API] Error calculando descuento para item {it.get('url')}: {e}")
+                logger.exception("Error calculando descuento para item %s", it.get('url'))
                 it['on_sale'] = False
                 it['discount_percent'] = None
 

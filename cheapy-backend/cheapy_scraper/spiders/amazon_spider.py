@@ -89,6 +89,5 @@ class AmazonSpider(scrapy.Spider):
                 'rating_str': rating_str.split(' ')[0] if rating_str else None,
                 'reviews_count_str': reviews_count_str,
                 'currency_code': self.currency,
-                'currency_code': self.currency,
                 'country_code': self.country_code
             }

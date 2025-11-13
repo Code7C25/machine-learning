@@ -1,13 +1,16 @@
 # cheapy-backend/cheapy_scraper/spiders/aliexpress_spider.py
 
 import scrapy
-from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 from cheapy_scraper.items import ProductItem
 # No necesitamos config.py para dominios, pero sí para la moneda si queremos ser precisos
 from config import COUNTRY_CURRENCIES 
+from scrapy_playwright.page import PageMethod
 
 class AliexpressSpider(scrapy.Spider):
     name = "aliexpress"
+    # Alinear política de paginación con el resto de spiders
+    MAX_PAGES = 2
     custom_settings = {
         'DOWNLOAD_HANDLERS': { "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler", "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler" },
         'TWISTED_REACTOR': "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
@@ -153,7 +156,7 @@ class AliexpressSpider(scrapy.Spider):
                     'playwright': True,
                     # FORZAMOS A ESPERAR 2 SEGUNDOS EXTRA después de que la página se considere cargada
                     'playwright_page_methods': [
-                        ('wait_for_timeout', 2000), # Espera 2000 milisegundos (2 segundos)
+                        PageMethod('wait_for_timeout', 2000), # Espera 2000 milisegundos (2 segundos)
                     ]
                 }
             )
@@ -165,10 +168,10 @@ class AliexpressSpider(scrapy.Spider):
                 url, 
                 headers=self.custom_headers, 
                 callback=self.parse,
-                 meta={
+                meta={
                     'playwright': True,
                     'playwright_page_methods': [
-                        ('wait_for_timeout', 2000), # Espera 2 segundos
+                        PageMethod('wait_for_timeout', 2000), # Espera 2 segundos
                     ]
                 }
             )

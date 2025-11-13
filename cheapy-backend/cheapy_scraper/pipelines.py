@@ -3,6 +3,24 @@ from itemadapter import ItemAdapter
 from scrapy.exceptions import DropItem # ¡Necesitas importar esto!
 
 # ===============================================
+# VALIDACIÓN BÁSICA GLOBAL
+# ===============================================
+
+class ValidationPipeline:
+    """
+    Reglas mínimas para descartar ítems incompletos de forma consistente en todas las tiendas.
+    - image_url obligatorio (evita tarjetas especiales/ads)
+    - url obligatoria (duplicado con DuplicatesPipeline, pero defensivo)
+    """
+    def process_item(self, item, spider):
+        adapter = ItemAdapter(item)
+        if not adapter.get('url'):
+            raise DropItem("Item sin URL: descartado por ValidationPipeline")
+        if not adapter.get('image_url'):
+            raise DropItem("Item sin image_url: descartado por ValidationPipeline")
+        return item
+
+# ===============================================
 # NUEVA PIPELINE DE DEDUPLICACIÓN
 # ===============================================
 

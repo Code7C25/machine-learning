@@ -6,7 +6,12 @@ from .celery_app import celery
 
 SCRAPY_PROJECT_PATH = str(Path(__file__).resolve().parent.parent)
 
-@celery.task(name='run_scrapy_spider_task')
+@celery.task(
+    name='run_scrapy_spider_task',
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={'max_retries': 2}
+)
 def run_scrapy_spider(spider_name: str, query: str, country: str):
     print(f"[WORKER] Iniciando tarea para spider: '{spider_name}', Query: '{query}', País: '{country}'")
     command = [

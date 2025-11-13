@@ -44,15 +44,25 @@ class MercadoLibreSpider(scrapy.Spider):
         self.page_count += 1
         self.logger.info(f"Parseando página {self.page_count}/{self.MAX_PAGES} - {response.url}")
 
-        for item in response.css('li.ui-search-layout__item'):
+        for item in response.css('li.ui-search-layout__item, li.ui-search-layout__item.shops__layout-item'):
             title = item.css('a.poly-component__title::text, h2.ui-search-item__title::text').get()
-            url = item.css('a.poly-component__title::attr(href), a.ui-search-link::attr(href)').get()
+            url = item.css('a.poly-component__title::attr(href), a.ui-search-link::attr(href), a.ui-search-result__content-wrapper::attr(href) ').get()
 
             # Selector de imagen EXACTAMENTE como lo tenías
-            image_url = item.css('.ui-search-result__image-container img::attr(data-src)').get() or \
-            item.css('.ui-search-result__image-container img::attr(src)').get() or \
-            item.css('.poly-card__portada img::attr(data-src)').get() or \
-            item.css('.poly-card__portada img::attr(src)').get()
+            # Imagen: ampliar selectores y soportar srcset
+            image_url = (
+                item.css('.ui-search-result__image-container img::attr(data-src)').get() or
+                item.css('.ui-search-result__image-container img::attr(src)').get() or
+                item.css('.ui-search-result__image img::attr(data-src)').get() or
+                item.css('.ui-search-result__image img::attr(src)').get() or
+                item.css('picture source::attr(srcset)').get() or
+                item.css('picture img::attr(src)').get() or
+                item.css('.poly-card__portada img::attr(data-src)').get() or
+                item.css('.poly-card__portada img::attr(src)').get()
+            )
+            if image_url and ' ' in image_url:
+                # Si es srcset, tomar la primera URL
+                image_url = image_url.split(' ')[0].strip()
 
             rating_str = item.css('span.poly-reviews__rating::text, .ui-search-reviews__rating-number::text').get()
             # Nuevo selector basado en la estructura actual de MercadoLibre
@@ -85,17 +95,25 @@ class MercadoLibreSpider(scrapy.Spider):
             final_price_fraction = price_fraction_discount or price_fraction_normal or price_fraction
             price_full_str = f"{price_symbol or ''}{final_price_fraction or ''}"
 
-            product = ProductItem()
-            product['title'] = title
-            # Normalizamos la URL: removemos query y fragment para evitar duplicados
+            # Filtrar entradas inválidas: sin imagen o con URL de tracking/externa
+            normalized_url = None
             if url:
                 try:
                     parsed = urlparse(url)
                     normalized_url = urlunparse(parsed._replace(query='', fragment=''))
                 except Exception:
                     normalized_url = url
-            else:
-                normalized_url = None
+
+            if not image_url:
+                # Saltar items sin imagen (suelen ser módulos especiales/ads)
+                continue
+
+            if normalized_url and self._is_bad_meli_url(normalized_url):
+                # Evitar URLs de tracking como click1.mercadolibre.com
+                continue
+
+            product = ProductItem()
+            product['title'] = title
             product['url'] = normalized_url
             product['image_url'] = image_url
             product['source'] = self.name
@@ -325,3 +343,15 @@ class MercadoLibreSpider(scrapy.Spider):
             return urlunparse(parsed._replace(query=new_query, fragment=''))
         except Exception:
             return None
+
+    def _is_bad_meli_url(self, url: str) -> bool:
+        """Detecta URLs de tracking/redirección que no son páginas de producto navegables."""
+        try:
+            p = urlparse(url)
+            host = (p.netloc or '').lower()
+            path = (p.path or '').lower()
+            if 'click1.mercadolibre' in host or 'mclics' in path:
+                return True
+            return False
+        except Exception:
+            return True

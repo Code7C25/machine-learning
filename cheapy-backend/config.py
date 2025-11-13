@@ -48,7 +48,8 @@ COUNTRY_TO_SPIDERS = {
     # Países con Múltiples Tiendas
     'MX': ['mercadolibre', 'amazon'],
     'BR': ['mercadolibre', 'amazon', 'aliexpress'],
-    'US': ['amazon', 'ebay', 'aliexpress'],
+    'US': ['amazon', 'ebay'],
+    # , 'aliexpress'
     'CA': ['amazon', 'ebay'],
     'ES': ['amazon', 'ebay', 'aliexpress'],
     
