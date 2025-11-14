@@ -4,5 +4,3 @@
 import { initializeDetectarBusqueda } from './background/detectar_busqueda.js';
 
 initializeDetectarBusqueda();
-
-
