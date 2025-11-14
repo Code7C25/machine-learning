@@ -77,7 +77,8 @@ async def buscar_producto(q: str, request: Request, country: str = None):
     
     # --- MODO DE PRUEBA (OPCIONAL) ---
     # Para forzar un país durante el desarrollo, puedes sobreescribir la variable aquí.
-    # country_code = "US"
+    
+    country_code = "US"
     
     spiders_to_run = COUNTRY_TO_SPIDERS.get(country_code, [])
     if not spiders_to_run:
