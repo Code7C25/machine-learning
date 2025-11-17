@@ -1,5 +1,5 @@
 import scrapy
-from config import AMAZON_DOMAINS, COUNTRY_CURRENCIES
+from config import AMAZON_DOMAINS, COUNTRY_CURRENCIES, ACCEPT_LANGUAGE_BY_COUNTRY
 from scrapy_playwright.page import PageMethod
 
 class AmazonSpider(scrapy.Spider):
@@ -21,10 +21,19 @@ class AmazonSpider(scrapy.Spider):
         self.start_urls = [f"https://www.amazon.{domain}/s?k={self.query.replace(' ', '+')}"]
         self.logger.info(f"Iniciando Amazon spider para País: {self.country_code}, Dominio: {domain}")
 
+        # Accept-Language: centralizado en config.py
+        self.accept_language = ACCEPT_LANGUAGE_BY_COUNTRY.get(
+            self.country_code,
+            ACCEPT_LANGUAGE_BY_COUNTRY.get('DEFAULT', 'en-US,en;q=0.9')
+        )
+
     def start_requests(self):
         for url in self.start_urls:
             yield scrapy.Request(
                 url, 
+                headers={
+                    'Accept-Language': self.accept_language,
+                },
                 meta={
                     'playwright': True,
                     'playwright_page_methods': [

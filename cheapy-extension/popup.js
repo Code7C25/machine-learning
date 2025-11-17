@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sortSelect = document.getElementById('sort-select');
     const resultsContainer = document.getElementById('results-container');
     const backToRecommendationsButton = document.getElementById('back-to-recommendations-button');
+    const similarityCheckbox = document.getElementById('similarity-checkbox');
 
     let allResults = [];
 
@@ -137,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- MANEJADORES DE EVENTOS ---
     sortSelect.addEventListener('change', () => displayAllResults());
+    similarityCheckbox.addEventListener('change', () => displayAllResults());
     
     showAllButton.addEventListener('click', () => {
         switchView('all');
@@ -150,8 +152,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNCIONES DE RENDERIZADO ---
     const displayRecommendations = () => {
         recommendationsSection.innerHTML = '';
-        const cheapest = [...allResults].sort((a, b) => a.price_numeric - b.price_numeric)[0];
-        const bestValue = [...allResults].filter(item => item.reviews_count > 0).sort((a, b) => (b.rating - a.rating) || (b.reviews_count - a.reviews_count))[0] || cheapest;
+        const cheapest = [...allResults].sort((a, b) => {
+            const simA = a.similarity_score || 0;
+            const simB = b.similarity_score || 0;
+            if (simB !== simA) return simB - simA;
+            return a.price_numeric - b.price_numeric;
+        })[0];
+        const bestValue = [...allResults].filter(item => item.reviews_count > 0).sort((a, b) => {
+            const simA = a.similarity_score || 0;
+            const simB = b.similarity_score || 0;
+            if (simB !== simA) return simB - simA;
+            if (b.rating - a.rating !== 0) return b.rating - a.rating;
+            return b.reviews_count - a.reviews_count;
+        })[0] || cheapest;
         
         if (cheapest) recommendationsSection.appendChild(createResultCard(cheapest, { label: 'Más Barato', className: 'cheapest' }));
         if (bestValue && (!cheapest || cheapest.url !== bestValue.url)) {
@@ -166,7 +179,13 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.innerHTML = '';
         const sortedResults = [...allResults];
         const sortBy = sortSelect.value;
+        const similarityChecked = similarityCheckbox.checked;
         sortedResults.sort((a, b) => {
+            if (similarityChecked) {
+                const simA = a.similarity_score || 0;
+                const simB = b.similarity_score || 0;
+                if (simB !== simA) return simB - simA;
+            }
             const priceA = a.price_numeric ?? Infinity; const priceB = b.price_numeric ?? Infinity;
             const reviewsA = a.reviews_count ?? 0; const reviewsB = b.reviews_count ?? 0;
             const ratingA = a.rating ?? 0; const ratingB = b.rating ?? 0;

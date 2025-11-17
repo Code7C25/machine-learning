@@ -10,6 +10,18 @@ from celery.result import GroupResult
 from worker.celery_app import celery as celery_app
 from config import COUNTRY_TO_SPIDERS
 
+# --- FUNCIÓN DE SIMILITUD ---
+def calculate_similarity_score(title: str, query: str) -> int:
+    if not title or not query:
+        return 0
+    title_lower = title.lower()
+    query_words = query.lower().split()
+    score = 0
+    for word in query_words:
+        if word in title_lower:
+            score += 1
+    return score
+
 # --- CONFIGURACIÓN ---
 app = FastAPI(title="Cheapy Scraper API - Async")
 logger = logging.getLogger("cheapy.api")
@@ -77,8 +89,7 @@ async def buscar_producto(q: str, request: Request, country: str = None):
     
     # --- MODO DE PRUEBA (OPCIONAL) ---
     # Para forzar un país durante el desarrollo, puedes sobreescribir la variable aquí.
-    
-    country_code = "US"
+    # country_code = "US"
     
     spiders_to_run = COUNTRY_TO_SPIDERS.get(country_code, [])
     if not spiders_to_run:
@@ -92,7 +103,9 @@ async def buscar_producto(q: str, request: Request, country: str = None):
     ]
     result_group = group(task_signatures).apply_async()
     result_group.save()
-    return {"task_id": result_group.id}
+    # Guardar la query para ordenamiento por similitud
+    celery_app.backend.set(f"query:{result_group.id}", q)
+    return {"task_id": result_group.id, "query": q}
 
 
 @app.get("/resultados/{task_id}")
@@ -212,7 +225,18 @@ def get_status(task_id: str):
                 it['on_sale'] = False
                 it['discount_percent'] = None
 
-        final_results.sort(key=lambda x: (-x.get("reviews_count", 0), x.get("price_numeric", float('inf'))))
+        # Recuperar la query para ordenamiento por similitud
+        query = celery_app.backend.get(f"query:{task_id}")
+        if query:
+            query = query.decode('utf-8') if isinstance(query, bytes) else query
+        else:
+            query = ""
+
+        # Calcular score de similitud para cada item
+        for item in final_results:
+            item['similarity_score'] = calculate_similarity_score(item.get('title', ''), query)
+
+        final_results.sort(key=lambda x: (-x.get("similarity_score", 0), -x.get("reviews_count", 0), x.get("price_numeric", float('inf'))))
         return {"status": "SUCCESS", "results": final_results, "debug_info": {"reviews_count_raw_included": True}}
     else:
         return {"status": "PENDING", "completed": f"{result_group.completed_count()}/{len(result_group)}"}

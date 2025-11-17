@@ -9,6 +9,22 @@ COUNTRY_CURRENCIES = {
     'IT': 'EUR', 'GB': 'GBP', 'JP': 'JPY', 'CN': 'CNY', 'AU': 'AUD', 'IN': 'INR',
 }
 
+# Preferencias de idioma por país (para cabecera HTTP Accept-Language)
+ACCEPT_LANGUAGE_BY_COUNTRY = {
+    'DEFAULT': 'en-US,en;q=0.9',
+    'US': 'en-US,en;q=0.9',
+    'CA': 'en-CA,en;q=0.8,fr-CA;q=0.6',
+    'GB': 'en-GB,en;q=0.9',
+    'ES': 'es-ES,es;q=0.9,en;q=0.6',
+    'AR': 'es-AR,es;q=0.9,en;q=0.6',
+    'MX': 'es-MX,es;q=0.9,en;q=0.6',
+    'BR': 'pt-BR,pt;q=0.9,en;q=0.6',
+    'DE': 'de-DE,de;q=0.9,en;q=0.6',
+    'FR': 'fr-FR,fr;q=0.9,en;q=0.6',
+    'IT': 'it-IT,it;q=0.9,en;q=0.6',
+    'JP': 'ja-JP,ja;q=0.9,en;q=0.6',
+}
+
 # --- Configuraciones por Tienda ---
 
 MERCADOLIBRE_DOMAINS = {

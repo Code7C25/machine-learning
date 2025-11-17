@@ -4,7 +4,7 @@ import scrapy
 from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 from cheapy_scraper.items import ProductItem
 # No necesitamos config.py para dominios, pero sí para la moneda si queremos ser precisos
-from config import COUNTRY_CURRENCIES 
+from config import COUNTRY_CURRENCIES, ACCEPT_LANGUAGE_BY_COUNTRY 
 from scrapy_playwright.page import PageMethod
 
 class AliexpressSpider(scrapy.Spider):
@@ -20,13 +20,6 @@ class AliexpressSpider(scrapy.Spider):
     }
     
     # Ali usa el parámetro page=N
-    
-    custom_headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-        'Referer': 'https://www.google.com/',
-    }
 
     def __init__(self, query="", country="AR", **kwargs):
         super().__init__(**kwargs)
@@ -37,6 +30,19 @@ class AliexpressSpider(scrapy.Spider):
         self.country_code = country.upper()
         # Nota: Ali express usa USD globalmente, pero podemos intentar obtener el tipo de moneda del país
         self.currency = COUNTRY_CURRENCIES.get(self.country_code, 'USD') 
+
+        # Accept-Language dinámico por país
+        accept_language = ACCEPT_LANGUAGE_BY_COUNTRY.get(
+            self.country_code,
+            ACCEPT_LANGUAGE_BY_COUNTRY.get('DEFAULT', 'en-US,en;q=0.9')
+        )
+
+        self.custom_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': accept_language,
+            'Referer': 'https://www.google.com/',
+        }
         
         # URL base de búsqueda con el query parameter 'SearchText'
         base_url = "https://www.aliexpress.com/wholesale"
