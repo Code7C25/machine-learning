@@ -1,86 +1,135 @@
 import re
 from itemadapter import ItemAdapter
-from scrapy.exceptions import DropItem # ¡Necesitas importar esto!
+from scrapy.exceptions import DropItem
 
-# ===============================================
-# VALIDACIÓN BÁSICA GLOBAL
-# ===============================================
 
 class ValidationPipeline:
     """
-    Reglas mínimas para descartar ítems incompletos de forma consistente en todas las tiendas.
-    - image_url obligatorio (evita tarjetas especiales/ads)
-    - url obligatoria (duplicado con DuplicatesPipeline, pero defensivo)
+    Pipeline de validación para asegurar la integridad básica de los items extraídos.
+
+    Implementa reglas mínimas de calidad para descartar items incompletos
+    de manera consistente across todos los spiders. Verifica la presencia
+    de campos críticos como URL e imagen para evitar contenido no válido
+    como anuncios o elementos promocionales.
     """
+
     def process_item(self, item, spider):
+        """
+        Valida la presencia de campos obligatorios en el item.
+
+        Args:
+            item: Item extraído por el spider.
+            spider: Instancia del spider (utilizado para contexto de logging).
+
+        Returns:
+            Item: El item si pasa validación.
+
+        Raises:
+            DropItem: Si faltan campos críticos como URL o imagen.
+        """
         adapter = ItemAdapter(item)
+
+        # Validación defensiva de campos obligatorios
         if not adapter.get('url'):
             raise DropItem("Item sin URL: descartado por ValidationPipeline")
+
         if not adapter.get('image_url'):
             raise DropItem("Item sin image_url: descartado por ValidationPipeline")
+
         return item
 
-# ===============================================
-# NUEVA PIPELINE DE DEDUPLICACIÓN
-# ===============================================
 
 class DuplicatesPipeline:
     """
-    Elimina ítems duplicados basándose en la URL normalizada del producto.
+    Pipeline de deduplicación basado en URLs normalizadas.
+
+    Utiliza un conjunto en memoria para rastrear URLs procesadas durante
+    la ejecución del spider, previniendo duplicados y optimizando el
+    rendimiento al evitar re-procesamiento de items idénticos.
     """
+
     def __init__(self):
-        # Usamos un conjunto (set) para almacenar las URLs vistas en esta corrida.
+        """
+        Inicializa el conjunto para rastreo de URLs vistas.
+        """
         self.urls_seen = set()
 
     def process_item(self, item, spider):
+        """
+        Verifica y registra URLs para prevenir duplicados.
+
+        Args:
+            item: Item candidato a procesamiento.
+            spider: Instancia del spider para logging contextual.
+
+        Returns:
+            Item: El item si no es duplicado.
+
+        Raises:
+            DropItem: Si la URL ya fue procesada anteriormente.
+        """
         adapter = ItemAdapter(item)
-        url = adapter.get('url') 
-        
-        # Es crucial que la URL haya sido normalizada en el Spider (Paso 3)
+        url = adapter.get('url')
+
+        # Validación crítica: items sin URL no pueden ser deduplicados
         if not url:
-            # Si no hay URL, el ítem no puede ser rastreado, lo descartamos
             raise DropItem("Item sin URL detectado, descartando.")
 
         if url in self.urls_seen:
-            # Si la URL ya fue vista, descartamos el ítem duplicado.
-            spider.logger.debug(f"Descartando ítem duplicado: {adapter['title']} - {url}")
+            # Logging de debug para monitoreo de duplicados
+            spider.logger.debug(f"Descartando ítem duplicado: {adapter.get('title', 'N/A')} - {url}")
             raise DropItem(f"Item duplicado encontrado: {url}")
         else:
-            # Si es nuevo, lo añadimos al conjunto y lo pasamos al siguiente pipeline.
+            # Registrar URL nueva y continuar procesamiento
             self.urls_seen.add(url)
             return item
 
-# ===============================================
-# TU PIPELINE DE LIMPIEZA EXISTENTE
-# ===============================================
-
 
 class DataCleaningPipeline:
+    """
+    Pipeline de limpieza y normalización de datos extraídos.
+
+    Realiza transformaciones críticas en campos numéricos y textuales,
+    adaptándose a diferentes formatos regionales (separadores decimales,
+    monedas, sufijos numéricos). Centraliza la lógica de normalización
+    para asegurar consistencia y calidad en los datos finales.
+    """
+
     def process_item(self, item, spider):
+        """
+        Aplica limpieza y normalización completa al item.
+
+        Args:
+            item: Item con datos crudos del spider.
+            spider: Instancia del spider para logging y contexto regional.
+
+        Returns:
+            Item: Item con datos limpios y normalizados.
+        """
         adapter = ItemAdapter(item)
 
-        # Obtenemos los códigos del spider
+        # Extraer metadatos de localización para lógica de formateo
         country_code = adapter.get('country_code', '').upper()
         currency_code = adapter.get('currency_code')
 
-        # --- 1. Limpieza de Precio y Moneda (BASADA EN PAÍS) ---
-        # Si price_numeric ya está definido (del spider), NO lo sobrescribimos
+        # Normalización de precios considerando formatos regionales
         existing_price_numeric = adapter.get('price_numeric')
-        
         price_str = adapter.get('price')
+
         if price_str:
+            # Remover caracteres no numéricos preservando separadores
             cleaned_str = re.sub(r'[^\d,.]', '', price_str)
-            
-            # Países que usan coma como separador decimal (ej: Argentina, España, Brasil)
+
+            # Países que utilizan coma como separador decimal
             countries_with_comma_decimal = ['AR', 'ES', 'BR', 'DE', 'FR', 'IT']
-            
+
             if country_code in countries_with_comma_decimal:
-                # Formato: 1.234,56 -> Quitar puntos, reemplazar coma por punto
+                # Convertir formato europeo: "1.234,56" -> "1234.56"
                 cleaned_str = cleaned_str.replace('.', '').replace(',', '.')
             else:
-                # Formato por defecto (US, MX, UK, etc.): 1,234.56 -> Quitar comas
+                # Convertir formato americano: "1,234.56" -> "1234.56"
                 cleaned_str = cleaned_str.replace(',', '')
-            
+
             try:
                 adapter['price_numeric'] = float(cleaned_str)
                 adapter['currency'] = currency_code
@@ -88,18 +137,17 @@ class DataCleaningPipeline:
                 adapter['price_numeric'] = None
                 adapter['currency'] = None
         elif existing_price_numeric is not None:
-            # Si no hay 'price' pero price_numeric ya existe, lo conservamos
+            # Preservar precio numérico si ya fue establecido por el spider
             adapter['currency'] = currency_code
         else:
             adapter['price_numeric'] = None
             adapter['currency'] = None
 
-        # --- 1.b Procesar precio anterior (si existe) para detectar descuentos ---
+        # Procesamiento del precio anterior para cálculo de descuentos
         price_before_str = adapter.get('price_before')
         if price_before_str:
             cleaned_before = re.sub(r'[^\d,.]', '', price_before_str)
-            countries_with_comma_decimal = ['AR', 'ES', 'BR', 'DE', 'FR', 'IT']
-            if country_code in countries_with_comma_decimal:
+            if country_code in ['AR', 'ES', 'BR', 'DE', 'FR', 'IT']:
                 cleaned_before = cleaned_before.replace('.', '').replace(',', '.')
             else:
                 cleaned_before = cleaned_before.replace(',', '')
@@ -110,15 +158,11 @@ class DataCleaningPipeline:
         else:
             adapter['price_before_numeric'] = None
 
-        # --- 1.c Determinar on_sale/discount_percent será responsabilidad de api/app.py ---
-        # Los spiders marcarán 'is_discounted' (bool). Aquí sólo preservamos
-        # price_numeric y price_before_numeric; app.py centralizará el cálculo
-        # final de 'on_sale' y 'discount_percent' para mantener consistencia.
-
-        # --- 2. Limpieza de Rating (no cambia) ---
+        # Normalización de ratings con manejo de formatos mixtos
         rating_str = adapter.get('rating_str')
         if rating_str:
             try:
+                # Extraer componente numérica principal
                 numeric_part = rating_str.split(' ')[0]
                 adapter['rating'] = float(numeric_part.replace(',', '.'))
             except (ValueError, TypeError):
@@ -126,28 +170,23 @@ class DataCleaningPipeline:
         else:
             adapter['rating'] = 0.0
 
-        # --- 3. Limpieza de Cantidad de Reseñas (no cambia) ---
+        # Normalización avanzada de conteos de reseñas con sufijos
         reviews_str = adapter.get('reviews_count_str')
-        # Conservar el valor crudo para depuración/traslado a la API
-        adapter['reviews_count_raw'] = reviews_str
+        adapter['reviews_count_raw'] = reviews_str  # Preservar original para debugging
+
         if reviews_str:
-            # Normalizar y detectar número + sufijo (K/M)
-            orig = reviews_str
-            # Si hay un número explícito entre paréntesis (ej: "(1178)" o "(10000000)"), lo preferimos
-            paren_match = re.search(r'\(([\d\.,]+)\)', orig)
+            # Priorizar números explícitos entre paréntesis
+            paren_match = re.search(r'\(([\d\.,]+)\)', reviews_str)
             if paren_match:
                 par_num = paren_match.group(1)
-                # Normalizar separadores y devolver directamente
                 norm = par_num
+                # Normalizar separadores en números parentéticos
                 if '.' in norm and ',' in norm:
                     norm = norm.replace('.', '').replace(',', '.')
                 elif '.' in norm and ',' not in norm:
                     parts = norm.split('.')
                     if len(parts[-1]) == 3:
                         norm = ''.join(parts)
-                    else:
-                        # No comma present; keep as-is (decimal)
-                        norm = norm
                 elif ',' in norm and '.' not in norm:
                     parts = norm.split(',')
                     if len(parts[-1]) == 3:
@@ -159,44 +198,42 @@ class DataCleaningPipeline:
                 except Exception:
                     adapter['reviews_count'] = 0
             else:
-                # Si la cadena contiene '|' (rating | ventas), preferimos la parte derecha
+                # Procesamiento de strings complejos sin paréntesis
+                orig = reviews_str
+
+                # Separar rating y ventas si están delimitados por '|'
                 if '|' in orig:
                     orig = orig.split('|')[-1]
 
+                # Limpiar y normalizar string
                 s = orig.replace('(', '').replace(')', '').replace('+', '').lower()
-                # Eliminar etiquetas frecuentes
                 s = s.replace('vendidos', '').replace('vendido', '').strip()
 
-                # Capturamos sufijos comunes: k, m, mil, millon(es)
-                # Orden importante: buscar primero tokens más largos (millones|millon|mil)
+                # Detectar patrón numérico con sufijo multiplicador
                 m = re.search(r'([\d\.,]+)\s*(millones|millon|mil|k|m)?', s, re.IGNORECASE)
                 if m:
                     num_str = m.group(1)
                     suffix_raw = (m.group(2) or '').lower()
 
-                    # Detectar multiplicador por sufijo textual
+                    # Calcular multiplicador basado en sufijo
                     multiplier = 1
                     if suffix_raw in ('k', 'mil'):
                         multiplier = 1000
                     elif suffix_raw in ('m', 'millon', 'millones'):
                         multiplier = 1000000
 
-                    # Normalizar separadores:
-                    # - Si hay sufijo (k/mil/million) tratamos '.' o ',' como decimal
-                    #   para que '1.012K' -> 1.012 * 1000 = 1012
+                    # Normalizar separadores considerando presencia de sufijo
                     norm = num_str
                     if suffix_raw in ('k', 'mil', 'm', 'millon', 'millones'):
                         norm = norm.replace(',', '.')
                     else:
-                        # Heurística para formatos sin sufijo: detectar separador de miles
+                        # Heurística para números sin sufijo explícito
                         if '.' in norm and ',' in norm:
                             norm = norm.replace('.', '').replace(',', '.')
                         elif '.' in norm and ',' not in norm:
                             parts = norm.split('.')
                             if len(parts[-1]) == 3:
                                 norm = ''.join(parts)
-                            else:
-                                norm = norm.replace(',', '.')
                         elif ',' in norm and '.' not in norm:
                             parts = norm.split(',')
                             if len(parts[-1]) == 3:
@@ -209,32 +246,32 @@ class DataCleaningPipeline:
                         adapter['reviews_count'] = int(round(val * multiplier))
                     except (ValueError, TypeError):
                         adapter['reviews_count'] = 0
-                    # Loguear casos sospechosos para facilitar depuración (por ejemplo 10_000_000)
+
+                    # Monitoreo de valores extremos para calidad de datos
                     try:
                         if adapter.get('reviews_count', 0) > 1000000:
-                            msg = f"[DataCleaningPipeline] reviews_count grande detectado: raw={reviews_str!r} -> parsed={adapter['reviews_count']} title={adapter.get('title')!r}"
+                            msg = (
+                                f"[DataCleaningPipeline] Conteo de reseñas alto detectado: "
+                                f"raw={reviews_str!r} -> parsed={adapter['reviews_count']} "
+                                f"title={adapter.get('title', 'N/A')!r}"
+                            )
                             if spider and hasattr(spider, 'logger'):
                                 spider.logger.warning(msg)
                             else:
-                                # En entornos de test sin spider, imprimimos por consola
                                 print(msg)
                     except Exception:
-                        # No romper el pipeline por un fallo en logging
-                        pass
+                        pass  # No interrumpir pipeline por fallos de logging
                 else:
                     adapter['reviews_count'] = 0
         else:
             adapter['reviews_count'] = 0
 
-        # Antes de eliminar el campo crudo 'price', guardamos una versión para mostrar tal cual
+        # Preservar versión display del precio antes de limpieza final
         adapter['price_display'] = adapter.get('price')
 
-        # Eliminar campos crudos que no queremos en el resultado final
-        adapter.pop('price', None)
-        adapter.pop('rating_str', None)
-        adapter.pop('reviews_count_str', None)
-        adapter.pop('currency_code', None)
-        adapter.pop('country_code', None)
-        # NOTA: conservamos price_before_numeric, price_before, on_sale y discount_percent
+        # Eliminar campos crudos innecesarios para output final
+        fields_to_remove = ['price', 'rating_str', 'reviews_count_str', 'currency_code', 'country_code']
+        for field in fields_to_remove:
+            adapter.pop(field, None)
 
         return item

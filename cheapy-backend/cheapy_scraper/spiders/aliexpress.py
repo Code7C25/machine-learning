@@ -1,128 +1,173 @@
-# cheapy-backend/cheapy_scraper/spiders/aliexpress_spider.py
+"""
+Spider de AliExpress para extracción de productos.
+
+Este spider rastrea el marketplace de AliExpress utilizando Playwright para
+renderizado de JavaScript, extrayendo información de productos con
+carga de contenido dinámico y manejo de paginación.
+"""
 
 import scrapy
 from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 from cheapy_scraper.items import ProductItem
-# No necesitamos config.py para dominios, pero sí para la moneda si queremos ser precisos
-from config import COUNTRY_CURRENCIES, ACCEPT_LANGUAGE_BY_COUNTRY 
+from config import COUNTRY_CURRENCIES, ACCEPT_LANGUAGE_BY_COUNTRY
 from scrapy_playwright.page import PageMethod
 
+
 class AliexpressSpider(scrapy.Spider):
+    """
+    Spider de Scrapy para la plataforma de comercio electrónico AliExpress.
+
+    Utiliza Playwright para renderizado de JavaScript para manejar contenido dinámico.
+    Extrae listados de productos con precios, calificaciones y reseñas desde
+    resultados de búsqueda de AliExpress en múltiples países.
+    """
+
     name = "aliexpress"
-    # Alinear política de paginación con el resto de spiders
     MAX_PAGES = 2
+
+    # Configuración de Playwright para renderizado de JavaScript
     custom_settings = {
-        'DOWNLOAD_HANDLERS': { "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler", "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler" },
+        'DOWNLOAD_HANDLERS': {
+            "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+            "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler"
+        },
         'TWISTED_REACTOR': "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
         'PLAYWRIGHT_LAUNCH_OPTIONS': {
-            'headless': False  # <-- CAMBIO 1: Poner en False para ver el navegador
+            'headless': False  # Visible browser for debugging
         }
     }
-    
-    # Ali usa el parámetro page=N
 
     def __init__(self, query="", country="AR", **kwargs):
+        """
+        Inicializa el spider con parámetros de búsqueda y configuración del navegador.
+
+        Args:
+            query: Término de búsqueda para consulta de productos (requerido).
+            country: Código de país para búsqueda localizada y moneda.
+
+        Raises:
+            ValueError: Si no se proporciona el parámetro query.
+        """
         super().__init__(**kwargs)
         if not query:
-            raise ValueError("El argumento 'query' es obligatorio.")
-        
+            raise ValueError("Query parameter is required.")
+
         self.query = query
         self.country_code = country.upper()
-        # Nota: Ali express usa USD globalmente, pero podemos intentar obtener el tipo de moneda del país
-        self.currency = COUNTRY_CURRENCIES.get(self.country_code, 'USD') 
 
-        # Accept-Language dinámico por país
+        # AliExpress primarily uses USD, but attempt country-specific currency
+        self.currency = COUNTRY_CURRENCIES.get(self.country_code, 'USD')
+
+        # Dynamic Accept-Language header based on country
         accept_language = ACCEPT_LANGUAGE_BY_COUNTRY.get(
             self.country_code,
             ACCEPT_LANGUAGE_BY_COUNTRY.get('DEFAULT', 'en-US,en;q=0.9')
         )
 
+        # Browser headers to mimic real user requests
         self.custom_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
             'Accept-Language': accept_language,
             'Referer': 'https://www.google.com/',
         }
-        
-        # URL base de búsqueda con el query parameter 'SearchText'
+
+        # Construct initial search URL with query parameters
         base_url = "https://www.aliexpress.com/wholesale"
-        
-        # Parámetros iniciales: Buscar por texto y establecer la página 1
         params = {
             'SearchText': self.query,
             'page': 1,
-            'g': 'y' # A veces necesario para cargar la página de resultados
+            'g': 'y'  # Parameter sometimes required for result loading
         }
-        
-        # Construye la URL inicial
+
         self.start_urls = [f"{base_url}?{urlencode(params)}"]
-        self.current_page = 1 
-        
-        self.logger.info(f"Iniciando spider para AliExpress. Búsqueda: {self.query}")
+        self.current_page = 1
+
+        self.logger.info(f"Initializing AliExpress spider for query: {self.query}")
 
     def normalize_url(self, url):
-        """Remueve fragmentos y query strings de seguimiento de AliExpress."""
+        """
+        Normalize AliExpress URLs by removing tracking parameters.
+
+        AliExpress URLs contain extensive tracking parameters. This method
+        strips query strings and fragments to get clean product URLs.
+
+        Args:
+            url: Raw URL from AliExpress.
+
+        Returns:
+            str: Normalized URL with tracking parameters removed.
+        """
         if not url:
             return url
-        
-        # AliExpress usa URLs muy largas. Queremos quedarnos solo con el identificador del producto.
+
         parsed = urlparse(url)
-        
-        # Para Ali, la URL única es típicamente el path
-        # Ejemplo: /item/100500123456.html
+        # For AliExpress, the product identifier is typically in the path
+        # Example: /item/100500123456.html
         return urlunparse(parsed._replace(query='', fragment=''))
-    
+
     def parse(self, response):
-        self.logger.info(f"Parseando página {self.current_page}/{self.MAX_PAGES} - {response.url}")
+        """
+        Parse search results page and extract product items.
 
-        # Intentamos obtener los contenedores de artículos, priorizando las clases comunes de Ali:
-        # 1. Contenedor de la vista de lista/galería principal
-        item_containers = response.css('div[data-spm="product_list"]') 
-        if not item_containers:
-            # 2. Selector genérico de la tarjeta del producto (más estable en la vista listado)
-            item_containers = response.css('div.man-pc-search-item-card') 
+        Handles AliExpress's dynamic HTML structure rendered by Playwright,
+        extracting product details and implementing pagination.
 
+        Args:
+            response: Scrapy response object with rendered HTML.
+        """
+        self.logger.info(f"Parsing page {self.current_page}/{self.MAX_PAGES} - {response.url}")
+
+        # Extract product containers with fallback selectors
+        item_containers = response.css('div[data-spm="product_list"]')
         if not item_containers:
-            # === CÓDIGO AÑADIDO PARA DEPURACIÓN ===
+            item_containers = response.css('div.man-pc-search-item-card')
+
+        # Debug: Save HTML if no items found
+        if not item_containers:
             filename = f'aliexpress_debug_page_{self.current_page}.html'
             with open(filename, 'w', encoding='utf-8') as f:
-                # response.text contiene el HTML renderizado por Playwright
                 f.write(response.text)
-            self.logger.critical(f"DEBUG: No se encontraron ítems. HTML guardado en {filename} para inspección.")
-            # === FIN CÓDIGO DEPURACIÓN ===
-
+            self.logger.critical(
+                f"DEBUG: No items found. HTML saved to {filename} for inspection."
+            )
 
         for item in item_containers:
-            # --- 1. URL y Título ---
-            # El enlace está generalmente asociado con el título o el wrapper de la tarjeta
-            link = item.css('a.man-pc-search-item-card__title::attr(href)').get() or \
-                   item.css('a::attr(href)').get() 
-            
+            # Extract product URL and title
+            link = (
+                item.css('a.man-pc-search-item-card__title::attr(href)').get() or
+                item.css('a::attr(href)').get()
+            )
+
             if link and not link.startswith('http'):
                 link = response.urljoin(link)
-                
-            title = item.css('a.man-pc-search-item-card__title::text').get() or \
-                    item.css('div.man-pc-search-item-card__title::text').get()
-            
-            # 2. Precio
-            # El precio actual suele estar en una clase que contiene la moneda y la fracción
-            price_current = item.css('div.man-pc-search-item-card__price-current::text').get() or \
-                            item.css('.price-current::text').get()
-            
-            # 3. Imagen
-            # La imagen principal, asegurando obtener el 'src'
+
+            title = (
+                item.css('a.man-pc-search-item-card__title::text').get() or
+                item.css('div.man-pc-search-item-card__title::text').get()
+            )
+
+            # Extract current price
+            price_current = (
+                item.css('div.man-pc-search-item-card__price-current::text').get() or
+                item.css('.price-current::text').get()
+            )
+
+            # Extract product image
             image_url = item.css('img.man-pc-search-item-card__thumbnail-img::attr(src)').get()
-            
-            # 4. Reviews/Rating (Suelen estar muy escondidos, usamos lo más probable)
+
+            # Extract rating and review information
             rating_str = item.css('.man-pc-search-item-card__star-level::text').get()
             reviews_count_str = item.css('.man-pc-search-item-card__feedback::text').get()
 
-            
+            # Skip incomplete items
             if not title or not link or not price_current:
-                self.logger.debug(f"Saltando ítem incompleto. Título: {title}, Link: {link}, Precio: {price_current}")
-                continue 
+                self.logger.debug(
+                    f"Skipping incomplete item. Title: {title}, Link: {link}, Price: {price_current}"
+                )
+                continue
 
-            # --- Creación y normalización del Ítem ---
+            # Create and normalize product item
             normalized_url = self.normalize_url(link)
 
             product = ProductItem()
@@ -135,49 +180,52 @@ class AliexpressSpider(scrapy.Spider):
             product['reviews_count_str'] = reviews_count_str
             product['currency_code'] = self.currency
             product['country_code'] = self.country_code
+
             yield product
 
-        # --- Lógica de Paginación (Usando el parámetro 'page') ---
+        # Pagination logic using page parameter
         if self.current_page < self.MAX_PAGES:
             self.current_page += 1
-            
-            # Parseamos la URL actual para manipular los parámetros
+
+            # Parse current URL and update page parameter
             parsed_url = urlparse(response.url)
             query_params = parse_qs(parsed_url.query)
-            
-            # Establecemos el nuevo número de página
+
             query_params['page'] = [str(self.current_page)]
-            
-            # Reconstruimos la URL
+
             new_query = urlencode(query_params, doseq=True)
             next_page_url = urlunparse(parsed_url._replace(query=new_query, fragment=''))
 
-            self.logger.info(f"Calculado: Próxima URL de AliExpress (Página {self.current_page})")
+            self.logger.info(f"Calculated next AliExpress URL (Page {self.current_page})")
 
             yield scrapy.Request(
-                url=next_page_url, 
+                url=next_page_url,
                 headers=self.custom_headers,
                 callback=self.parse,
                 meta={
                     'playwright': True,
-                    # FORZAMOS A ESPERAR 2 SEGUNDOS EXTRA después de que la página se considere cargada
                     'playwright_page_methods': [
-                        PageMethod('wait_for_timeout', 2000), # Espera 2000 milisegundos (2 segundos)
+                        PageMethod('wait_for_timeout', 2000),  # Wait 2 seconds for content load
                     ]
                 }
             )
 
     def start_requests(self):
+        """
+        Generate initial requests with Playwright configuration.
+
+        Ensures all requests use Playwright for JavaScript rendering
+        with appropriate wait times for dynamic content loading.
+        """
         for url in self.start_urls:
-            # CRÍTICO: Añadir meta={'playwright': True} a la solicitud inicial
             yield scrapy.Request(
-                url, 
-                headers=self.custom_headers, 
+                url,
+                headers=self.custom_headers,
                 callback=self.parse,
                 meta={
                     'playwright': True,
                     'playwright_page_methods': [
-                        PageMethod('wait_for_timeout', 2000), # Espera 2 segundos
+                        PageMethod('wait_for_timeout', 2000),  # Initial 2-second wait
                     ]
                 }
             )

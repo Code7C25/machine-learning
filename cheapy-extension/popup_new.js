@@ -1,13 +1,13 @@
 /**
- * Script del Popup de la Extensión Chrome Cheapy
+ * Cheapy Chrome Extension Popup Script
  *
- * Maneja la interfaz de usuario para la extensión de comparación de precios Cheapy.
- * Gestiona la iniciación de búsquedas, consulta de resultados y visualización con
- * capacidades de ordenamiento y filtrado.
+ * Handles the user interface for the Cheapy price comparison extension.
+ * Manages search initiation, result polling, and result display with
+ * sorting and filtering capabilities.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Referencias a elementos del DOM para manipulación de UI
+    // DOM element references for UI manipulation
     const statusMessage = document.getElementById('status-message');
     const queryTitle = document.getElementById('query-title');
     const recommendationsView = document.getElementById('recommendations-view');
@@ -22,16 +22,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let allResults = [];
 
     /**
-     * Controla el cambio de vista entre diferentes estados de UI.
-     * @param {string} viewName - La vista a mostrar ('loading', 'recommendations', 'all')
+     * Controls view switching between different UI states.
+     * @param {string} viewName - The view to display ('loading', 'recommendations', 'all')
      */
     const switchView = (viewName) => {
-        // Ocultar todos los contenedores principales para empezar con estado limpio
+        // Hide all main containers to start with clean state
         statusMessage.style.display = 'none';
         recommendationsView.style.display = 'none';
         allResultsView.style.display = 'none';
 
-        // Mostrar solo el contenedor correspondiente a la vista actual
+        // Show only the container corresponding to current view
         switch (viewName) {
             case 'loading':
                 statusMessage.style.display = 'block';

@@ -3,27 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="popup.css">
+    <title>Cheapy - Comparador de Precios</title>
 </head>
 <body>
     <div class="container">
+        <!-- Sección de encabezado con logo y título -->
         <div class="header">
             <img src="icons/icon.png" alt="Cheapy Logo" class="logo">
-            <h1 id="query-title">Cheapy</h1> 
+            <h1 id="query-title">Cheapy</h1>
         </div>
-        
-        <!-- Contenedor para mensajes de estado -->
+
+        <!-- Contenedor de mensaje de estado para estados de carga -->
         <div id="status-message" style="display: none;">Cargando...</div>
 
-        <!-- Vista de Recomendaciones -->
+        <!-- Vista de recomendaciones - muestra productos recomendados principales -->
         <div id="recommendations-view" style="display: none;">
             <div id="recommendations" class="results-section">
-                <!-- Tarjetas de recomendación aquí -->
+                <!-- Las tarjetas de recomendación de productos se insertarán aquí -->
             </div>
             <button id="show-all-button" class="action-btn">Ver todos los resultados</button>
         </div>
 
-        <!-- Vista de "Todos los Resultados" -->
+        <!-- Vista de todos los resultados - muestra listado completo de productos con ordenamiento -->
         <div id="all-results-view" style="display: none;">
+            <!-- Controles de ordenamiento y filtrado -->
             <div class="sort-controls">
                 <label>
                     <input type="checkbox" id="similarity-checkbox" checked>
@@ -37,11 +40,12 @@
                 <option value="reviews">Más reseñas</option>
                 <option value="deal_desc">Mayor oferta</option>
             </select>
-            
+
+            <!-- Contenedor de lista de resultados completos -->
             <ul id="results-container">
-                <!-- Lista completa de resultados aquí -->
+                <!-- Los resultados completos de productos se insertarán aquí -->
             </ul>
-            
+
             <button id="back-to-recommendations-button" class="action-btn">↑ Volver a recomendaciones</button>
         </div>
     </div>

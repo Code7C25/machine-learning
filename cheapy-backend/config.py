@@ -1,6 +1,3 @@
-# cheapy-backend/config.py
-
-# Mapeo genérico de códigos de país a sus monedas oficiales
 COUNTRY_CURRENCIES = {
     'AR': 'ARS', 'MX': 'MXN', 'CO': 'COP', 'CL': 'CLP', 'BR': 'BRL', 'UY': 'UYU',
     'PE': 'PEN', 'CR': 'CRC', 'GT': 'GTQ', 'HN': 'HNL', 'NI': 'NIO', 'PA': 'PAB',
@@ -9,7 +6,6 @@ COUNTRY_CURRENCIES = {
     'IT': 'EUR', 'GB': 'GBP', 'JP': 'JPY', 'CN': 'CNY', 'AU': 'AUD', 'IN': 'INR',
 }
 
-# Preferencias de idioma por país (para cabecera HTTP Accept-Language)
 ACCEPT_LANGUAGE_BY_COUNTRY = {
     'DEFAULT': 'en-US,en;q=0.9',
     'US': 'en-US,en;q=0.9',
@@ -24,8 +20,6 @@ ACCEPT_LANGUAGE_BY_COUNTRY = {
     'IT': 'it-IT,it;q=0.9,en;q=0.6',
     'JP': 'ja-JP,ja;q=0.9,en;q=0.6',
 }
-
-# --- Configuraciones por Tienda ---
 
 MERCADOLIBRE_DOMAINS = {
     'AR': 'com.ar', 'MX': 'com.mx', 'CO': 'com.co', 'CL': 'cl', 'BR': 'com.br',
@@ -49,25 +43,17 @@ ALIEXPRESS_DOMAINS = {
     'FR': 'fr.aliexpress.com',
     'DE': 'de.aliexpress.com',
     'IT': 'it.aliexpress.com',
-    'BR': 'pt.aliexpress.com', # Para Brasil, es el subdominio de portugués
-    'US': 'www.aliexpress.com', # Para EEUU y por defecto, es www.
+    'BR': 'pt.aliexpress.com',
+    'US': 'www.aliexpress.com',
 }
 
-# --- Cerebro del Despachador ---
-# Mapeo de país a una lista de spiders que se ejecutarán para ese país.
 COUNTRY_TO_SPIDERS = {
-    # LATAM
     'AR': ['mercadolibre','fravega'],
     'CO': ['mercadolibre'],
     'CL': ['mercadolibre'],
-    
-    # Países con Múltiples Tiendas
     'MX': ['mercadolibre', 'amazon'],
     'BR': ['mercadolibre', 'amazon', 'aliexpress'],
     'US': ['amazon', 'ebay'],
-    # , 'aliexpress'
     'CA': ['amazon', 'ebay'],
     'ES': ['amazon', 'ebay', 'aliexpress'],
-    
-    # Por defecto, si un país no está aquí, no se ejecutará ningún spider.
 }
