@@ -15,4 +15,5 @@ playwright/.cache/
 tests/
 
 # Carpeta de la extensión frontend
-cheapy-extension/
+cheapy-extension/cheapy-extension.crx
+cheapy-extension/cheapy-extension.pem
