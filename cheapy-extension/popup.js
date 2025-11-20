@@ -229,53 +229,47 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Displays all search results with sorting and filtering options.
+     * Muestra todos los resultados de búsqueda con opciones de ordenamiento y filtrado.
+     * Optimizado para rendimiento con separación de criterios de ordenamiento.
      */
     const displayAllResults = () => {
         resultsContainer.innerHTML = '';
         const sortedResults = [...allResults];
+
+        // Aplicar ordenamiento por similitud primero si está activado
+        if (similarityCheckbox.checked) {
+            sortedResults.sort((a, b) => (b.similarity_score || 0) - (a.similarity_score || 0));
+        }
+
+        // Aplicar ordenamiento secundario según la selección del usuario
         const sortBy = sortSelect.value;
-        const similarityChecked = similarityCheckbox.checked;
-
         sortedResults.sort((a, b) => {
-            // Prioritize similarity if checkbox is checked
-            if (similarityChecked) {
-                const simA = a.similarity_score || 0;
-                const simB = b.similarity_score || 0;
-                if (simB !== simA) return simB - simA;
-            }
-
-            // Extract comparison values
-            const priceA = a.price_numeric ?? Infinity;
-            const priceB = b.price_numeric ?? Infinity;
-            const reviewsA = a.reviews_count ?? 0;
-            const reviewsB = b.reviews_count ?? 0;
-            const ratingA = a.rating ?? 0;
-            const ratingB = b.rating ?? 0;
-
-            // Calculate discount percentages
-            const discA = (typeof a.discount_percent === 'number') ? a.discount_percent :
-                (a.price_before_numeric && a.price_numeric ?
-                    Math.max(0, ((a.price_before_numeric - a.price_numeric) / a.price_before_numeric) * 100) : 0);
-            const discB = (typeof b.discount_percent === 'number') ? b.discount_percent :
-                (b.price_before_numeric && b.price_numeric ?
-                    Math.max(0, ((b.price_before_numeric - b.price_numeric) / b.price_before_numeric) * 100) : 0);
-
-            // Apply selected sorting criteria
             switch (sortBy) {
-                case 'price_asc': return priceA - priceB;
-                case 'price_desc': return priceB - priceA;
-                case 'reviews': return reviewsB - reviewsA;
+                case 'price_asc':
+                    return (a.price_numeric || 0) - (b.price_numeric || 0);
+                case 'price_desc':
+                    return (b.price_numeric || 0) - (a.price_numeric || 0);
+                case 'reviews':
+                    return (b.reviews_count || 0) - (a.reviews_count || 0);
                 case 'deal_desc':
-                    // Sort by deals first, then by discount percentage
-                    if ((b.on_sale === true) !== (a.on_sale === true)) {
-                        return (b.on_sale === true) ? 1 : -1;
-                    }
-                    return (discB || 0) - (discA || 0);
+                    // Ordenar por ofertas primero, luego por porcentaje de descuento
+                    const dealA = a.on_sale === true ? 1 : 0;
+                    const dealB = b.on_sale === true ? 1 : 0;
+                    if (dealB !== dealA) return dealB - dealA;
+
+                    const discA = a.discount_percent ||
+                        (a.price_before_numeric && a.price_numeric ?
+                            ((a.price_before_numeric - a.price_numeric) / a.price_before_numeric) * 100 : 0);
+                    const discB = b.discount_percent ||
+                        (b.price_before_numeric && b.price_numeric ?
+                            ((b.price_before_numeric - b.price_numeric) / b.price_before_numeric) * 100 : 0);
+                    return discB - discA;
                 case 'relevance':
                 default:
-                    if (ratingB !== ratingA) { return ratingB - ratingA; }
-                    return reviewsB - reviewsA;
+                    // Ordenar por rating primero, luego por cantidad de reseñas
+                    const ratingDiff = (b.rating || 0) - (a.rating || 0);
+                    if (ratingDiff !== 0) return ratingDiff;
+                    return (b.reviews_count || 0) - (a.reviews_count || 0);
             }
         });
 

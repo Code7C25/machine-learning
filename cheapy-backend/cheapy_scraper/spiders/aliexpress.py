@@ -9,17 +9,17 @@ carga de contenido dinámico y manejo de paginación.
 import scrapy
 from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
 from cheapy_scraper.items import ProductItem
-from config import COUNTRY_CURRENCIES, ACCEPT_LANGUAGE_BY_COUNTRY
+from config import COUNTRY_CURRENCIES
 from scrapy_playwright.page import PageMethod
+from .base_spider import BaseCheapySpider
 
 
-class AliexpressSpider(scrapy.Spider):
+class AliexpressSpider(BaseCheapySpider):
     """
     Spider de Scrapy para la plataforma de comercio electrónico AliExpress.
 
-    Utiliza Playwright para renderizado de JavaScript para manejar contenido dinámico.
-    Extrae listados de productos con precios, calificaciones y reseñas desde
-    resultados de búsqueda de AliExpress en múltiples países.
+    Hereda de BaseCheapySpider para configuración común de headers y país.
+    Utiliza Playwright para renderizado de JavaScript y manejo de contenido dinámico.
     """
 
     name = "aliexpress"
@@ -33,57 +33,49 @@ class AliexpressSpider(scrapy.Spider):
         },
         'TWISTED_REACTOR': "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
         'PLAYWRIGHT_LAUNCH_OPTIONS': {
-            'headless': False  # Visible browser for debugging
+            'headless': False  # Navegador visible para debugging
         }
     }
 
     def __init__(self, query="", country="AR", **kwargs):
         """
-        Inicializa el spider con parámetros de búsqueda y configuración del navegador.
+        Inicializa el spider con parámetros de búsqueda y configuración regional.
 
         Args:
-            query: Término de búsqueda para consulta de productos (requerido).
-            country: Código de país para búsqueda localizada y moneda.
+            query: Término de búsqueda para consulta de productos (requerido)
+            country: Código de país para búsqueda localizada y moneda
 
         Raises:
-            ValueError: Si no se proporciona el parámetro query.
+            ValueError: Si no se proporciona el parámetro query
         """
-        super().__init__(**kwargs)
         if not query:
-            raise ValueError("Query parameter is required.")
+            raise ValueError("El parámetro query es requerido.")
 
+        # Inicializar clase base con configuración de país
+        super().__init__(country=country, **kwargs)
         self.query = query
-        self.country_code = country.upper()
 
-        # AliExpress primarily uses USD, but attempt country-specific currency
+        # AliExpress usa principalmente USD, pero intenta moneda específica del país
         self.currency = COUNTRY_CURRENCIES.get(self.country_code, 'USD')
 
-        # Dynamic Accept-Language header based on country
-        accept_language = ACCEPT_LANGUAGE_BY_COUNTRY.get(
-            self.country_code,
-            ACCEPT_LANGUAGE_BY_COUNTRY.get('DEFAULT', 'en-US,en;q=0.9')
-        )
-
-        # Browser headers to mimic real user requests
-        self.custom_headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': accept_language,
+        # Headers del navegador para simular requests de usuario real
+        self.custom_headers = self.get_default_headers()
+        self.custom_headers.update({
             'Referer': 'https://www.google.com/',
-        }
+        })
 
-        # Construct initial search URL with query parameters
+        # Construir URL inicial de búsqueda con parámetros de consulta
         base_url = "https://www.aliexpress.com/wholesale"
         params = {
             'SearchText': self.query,
             'page': 1,
-            'g': 'y'  # Parameter sometimes required for result loading
+            'g': 'y'  # Parámetro requerido para carga de resultados
         }
 
         self.start_urls = [f"{base_url}?{urlencode(params)}"]
         self.current_page = 1
 
-        self.logger.info(f"Initializing AliExpress spider for query: {self.query}")
+        self.logger.info(f"Inicializando spider de AliExpress para consulta: {self.query}")
 
     def normalize_url(self, url):
         """

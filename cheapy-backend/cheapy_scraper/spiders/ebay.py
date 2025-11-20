@@ -7,17 +7,17 @@ filtrado de contenido para evitar items promocionales genéricos.
 """
 
 import scrapy
-from config import EBAY_DOMAINS, COUNTRY_CURRENCIES, ACCEPT_LANGUAGE_BY_COUNTRY
+from config import EBAY_DOMAINS, COUNTRY_CURRENCIES
 from scrapy_playwright.page import PageMethod
+from .base_spider import BaseCheapySpider
 
 
-class EbaySpider(scrapy.Spider):
+class EbaySpider(BaseCheapySpider):
     """
     Spider de Scrapy para la plataforma de comercio electrónico eBay.
 
-    Utiliza Playwright para renderizado de JavaScript para manejar contenido dinámico.
-    Extrae listados de productos desde resultados de búsqueda de eBay con filtrado
-    para excluir contenido promocional genérico e items patrocinados.
+    Hereda de BaseCheapySpider para configuración común de headers y país.
+    Utiliza Playwright para renderizado de JavaScript y manejo de contenido dinámico.
     """
 
     name = "ebay"
@@ -30,50 +30,44 @@ class EbaySpider(scrapy.Spider):
         },
         'TWISTED_REACTOR': "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
         'PLAYWRIGHT_LAUNCH_OPTIONS': {
-            'headless': True  # Headless mode for production performance
+            'headless': True  # Modo headless para rendimiento en producción
         }
     }
 
     def __init__(self, query="", country="US", **kwargs):
         """
-        Inicializa el spider con parámetros de búsqueda y configuración de dominio.
+        Inicializa el spider con parámetros de búsqueda y configuración regional.
 
         Args:
-            query: Término de búsqueda para consulta de productos.
-            country: Código de país para selección de dominio de eBay (ej. 'US', 'UK', 'DE').
+            query: Término de búsqueda para consulta de productos
+            country: Código de país para selección de dominio de eBay (ej. 'US', 'UK', 'DE')
         """
-        super().__init__(**kwargs)
+        # Inicializar clase base con configuración de país
+        super().__init__(country=country, **kwargs)
         self.query = query
-        self.country_code = country.upper()
 
         # Obtener dominio y moneda desde configuración centralizada
         domain = EBAY_DOMAINS.get(self.country_code, EBAY_DOMAINS['US'])
         self.currency = COUNTRY_CURRENCIES.get(self.country_code, 'USD')
 
-        # Construct search URL for the appropriate eBay domain
+        # Construir URL de búsqueda para el dominio apropiado
         self.start_urls = [f"https://www.ebay.{domain}/sch/i.html?_nkw={self.query.replace(' ', '+')}"]
 
-        self.logger.info(f"Initializing eBay spider for country: {self.country_code}, domain: {domain}")
-
-        # Dynamic Accept-Language header based on country
-        self.accept_language = ACCEPT_LANGUAGE_BY_COUNTRY.get(
-            self.country_code,
-            ACCEPT_LANGUAGE_BY_COUNTRY.get('DEFAULT', 'en-US,en;q=0.9')
-        )
+        self.logger.info(f"Inicializando spider de eBay para país: {self.country_code}, dominio: {domain}")
 
     def start_requests(self):
         """
-        Generate initial requests with Playwright configuration.
+        Genera requests iniciales con configuración de Playwright.
 
-        Configures Playwright to wait for product cards to load,
-        ensuring dynamic content is available before parsing.
+        Configura Playwright para esperar a que se carguen las tarjetas de productos,
+        asegurando que el contenido dinámico esté disponible antes del parsing.
         """
+        headers = self.get_default_headers()
+
         for url in self.start_urls:
             yield scrapy.Request(
                 url,
-                headers={
-                    'Accept-Language': self.accept_language,
-                },
+                headers=headers,
                 meta={
                     'playwright': True,
                     'playwright_page_methods': [
@@ -84,10 +78,10 @@ class EbaySpider(scrapy.Spider):
 
     def parse(self, response):
         """
-        Parse eBay search results and extract product items.
+        Parsea resultados de búsqueda de eBay y extrae items de productos.
 
-        Filters out generic promotional content and sponsored items
-        by checking for meaningful product titles.
+        Filtra contenido promocional genérico y items patrocinados
+        verificando títulos de productos significativos.
 
         Args:
             response: Scrapy response object with rendered HTML.

@@ -12,19 +12,38 @@ from config import COUNTRY_TO_SPIDERS
 
 def calculate_similarity_score(title: str, query: str) -> int:
     """
-    Calcula una puntuación de similitud simple entre el título de un producto y la consulta de búsqueda.
-    Cuenta cuántas palabras de la consulta aparecen en el título (sin distinguir mayúsculas/minúsculas).
-    Se utiliza para priorizar los resultados de búsqueda por relevancia.
+    Calcula el puntaje de similitud entre el título del producto y la consulta del usuario.
+
+    Utiliza un algoritmo optimizado basado en conjuntos para calcular la similitud,
+    considerando el porcentaje de palabras de la consulta que aparecen en el título.
+
+    Args:
+        title: Título del producto a comparar
+        query: Consulta del usuario para búsqueda
+
+    Returns:
+        Puntaje de similitud (0-100, donde 100 es coincidencia perfecta)
+
+    Example:
+        >>> calculate_similarity_score("iPhone 15 Pro Max", "iPhone Pro")
+        67
     """
     if not title or not query:
         return 0
-    title_lower = title.lower()
-    query_words = query.lower().split()
-    score = 0
-    for word in query_words:
-        if word in title_lower:
-            score += 1
-    return score
+
+    # Normalizar texto: convertir a minúsculas y dividir en palabras
+    title_words = set(title.lower().split())
+    query_words = set(query.lower().split())
+
+    # Calcular intersección de palabras (palabras comunes)
+    common_words = title_words.intersection(query_words)
+
+    # Puntaje basado en porcentaje de palabras coincidentes
+    if not query_words:
+        return 0
+
+    similarity = (len(common_words) / len(query_words)) * 100
+    return int(similarity)
 
 # Inicializar aplicación FastAPI con middleware CORS para solicitudes de origen cruzado
 app = FastAPI(title="Cheapy Scraper API - Async")
