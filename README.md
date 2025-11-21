@@ -24,7 +24,10 @@ Actualmente permite obtener resultados de **Mercado Libre**, mostrando precios y
 * Scrapy
 * BeautifulSoup4
 * httpx
-* Crochet
+* celery
+* redis
+* playwright
+* scrapy-playwright
 
 ## 🚀 Instalación y uso
 
@@ -47,7 +50,13 @@ venv\Scripts\activate      # Windows
 pip install -r requirements.txt
 
 # Ejecutar el servidor
-uvicorn main:app --reload
+se necesitan 2 cmd, el primero con el siguiente comando:
+
+uvicorn api.app:app --reload --host 0.0.0.0
+
+el segundo con:
+
+celery -A worker.celery_app worker --loglevel=info -P threads -c 4
 ```
 
 ### 3. Instalar la extensión en Chrome/Chromium
@@ -75,4 +84,3 @@ Actualmente el proyecto se encuentra en **fase de desarrollo funcional**, con in
 ## 🤝 Contribuciones
 
 Este es un proyecto personal para fines académicos, pero cualquier sugerencia o mejora es bienvenida.
-
