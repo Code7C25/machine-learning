@@ -127,7 +127,7 @@ class MercadoLibreSpider(scrapy.Spider):
                             f"title={title!r} url={url!r}"
                         )
             except Exception:
-                pass  # Don't break parsing on logging failures
+                pass  # No interrumpa el análisis ante errores de registro
 
             # Extraer componentes de precio con múltiples selectores para diferentes layouts
             price_symbol = item.css('.andes-money-amount__currency-symbol::text').get()
@@ -168,14 +168,14 @@ class MercadoLibreSpider(scrapy.Spider):
             price_before_numeric = None
             discount_label_text = None
 
-            # Convert current price to numeric value
+            # Convertir el precio actual a valor numérico
             try:
                 if final_price_fraction:
                     price_numeric = self.money_to_float(final_price_fraction)
             except Exception:
                 pass
 
-            # Extract previous price and discount information
+            #Extraer información anterior de precios y descuentos.
             try:
                 prev_fraction = (
                     item.css('s.andes-money-amount--previous .andes-money-amount__fraction::text').get() or
@@ -190,18 +190,18 @@ class MercadoLibreSpider(scrapy.Spider):
             except Exception:
                 pass
 
-            # Fallback heuristic: analyze all monetary text in the item
+            # Heurística alternativa: analiza todo el texto monetario del artículo
             try:
                 money_candidates = item.css('*::text').re(r'[\$€£]\s*[\d\.,]+')
                 money_candidates = [m.strip() for m in money_candidates if m and m.strip()]
 
-                # Remove duplicates while preserving order
+                # Eliminar duplicados manteniendo el orden
                 unique_money = []
                 for m in money_candidates:
                     if m not in unique_money:
                         unique_money.append(m)
 
-                # Convert all candidates to numeric values
+                # Convertir todos los candidatos a valores numéricos
                 money_numeric = []
                 for text in unique_money:
                     try:
@@ -211,22 +211,22 @@ class MercadoLibreSpider(scrapy.Spider):
                     except Exception:
                         pass
 
-                # Infer current price if direct selectors missed it
+                # Inferir el precio actual si los selectores directos lo omitieron
                 if price_numeric is None and money_numeric:
                     price_numeric = min([n for _, n in money_numeric])
                     price_full_str = money_numeric[0][0]
 
-                # Detect previous price heuristically if direct selectors failed
+                # Detectar heurísticamente el precio anterior si fallaron los selectores directos
                 if price_before_numeric is None and price_numeric and len(money_numeric) > 1:
                     for text, num in money_numeric:
-                        if num > price_numeric * 1.01:  # More than 1% higher than current
+                        if num > price_numeric * 1.01:  # Más del 1% superior al actual
                             price_before = text
                             price_before_numeric = num
                             break
             except Exception:
                 pass
 
-            # Populate product item with price information
+            # Complete el artículo del producto con información de precios
             product['price'] = price_full_str if price_numeric else None
             product['price_before'] = price_before
             product['rating_str'] = rating_str
@@ -236,7 +236,7 @@ class MercadoLibreSpider(scrapy.Spider):
             product['price_numeric'] = price_numeric
             product['price_before_numeric'] = price_before_numeric
 
-            # Determine if product is discounted
+            # Determinar si el producto tiene descuento.
             is_discounted = False
             try:
                 if discount_label_text:
@@ -250,7 +250,7 @@ class MercadoLibreSpider(scrapy.Spider):
 
             yield product
 
-        # Handle pagination: try next button first, then fallback to URL computation
+        # Handle pagination: Pruebe primero con el botón Siguiente y luego recurra al cálculo de URL.
         if self.page_count < self.MAX_PAGES:
             next_url = self._extract_next_link(response)
             if not next_url:
@@ -268,68 +268,68 @@ class MercadoLibreSpider(scrapy.Spider):
 
     def start_requests(self):
         """
-        Generate initial requests with custom headers.
+        Genere solicitudes iniciales con encabezados personalizados.
 
-        Ensures all requests, including the first one, use consistent
-        headers to avoid detection.
+        Garantiza que todas las solicitudes, incluida la primera, utilicen información coherente
+        encabezados para evitar la detección.
         """
         for url in self.start_urls:
             yield scrapy.Request(url, headers=self.custom_headers, callback=self.parse)
 
     def money_to_float(self, money_str):
         """
-        Convert monetary strings to float values.
+        Convertir cadenas monetarias en valores flotantes.
 
-        Handles both European (1.234,56) and US (1,234.56) number formats,
-        automatically detecting decimal separators based on context.
+        Maneja formatos de números europeos (1.234,56) y estadounidenses (1.234,56).
+        detectar automáticamente separadores decimales según el contexto.
 
         Args:
-            money_str: String containing currency symbol and numeric value.
+            money_str: Cadena que contiene símbolo de moneda y valor numérico.
 
         Returns:
-            float or None: Parsed numeric value, or None if parsing fails.
+            float or None: Valor numérico analizado o Ninguno si falla el análisis.
         """
         if not money_str or not isinstance(money_str, str):
             return None
 
-        # Remove currency symbols and whitespace
+        # Eliminar símbolos de moneda y espacios en blanco
         cleaned = re.sub(r'[\$€£\s]', '', money_str.strip())
 
-        # Return None if no digits found
+        # Devuelve Ninguno si no se encuentran dígitos
         if not re.search(r'\d', cleaned):
             return None
 
-        # Find the last separator (potential decimal point)
+        # Encuentre el último separador (punto decimal potencial)
         last_sep_pos = max(cleaned.rfind(','), cleaned.rfind('.'))
 
         if last_sep_pos == -1:
-            # No separator found, treat as integer
+            # No se encontró separador, tratar como entero
             try:
                 return float(cleaned)
             except ValueError:
                 return None
 
-        # Split into parts before and after last separator
+        # Dividir en partes antes y después del último separador
         before_sep = cleaned[:last_sep_pos]
         after_sep = cleaned[last_sep_pos + 1:]
 
-        # Determine separator type based on decimal part length
+        # Determinar el tipo de separador según la longitud de la parte decimal
         if len(after_sep) == 2:
-            # European format: thousands separator is dot, decimal is comma
+            # Formato europeo: separador de miles es punto, decimal es coma
             thousands_part = before_sep.replace('.', '')
             try:
                 return float(thousands_part + '.' + after_sep)
             except ValueError:
                 return None
         elif len(after_sep) >= 3:
-            # US format: last separator is thousands separator
+            # Formato estadounidense: el último separador es separador de miles
             thousands_part = before_sep.replace(',', '') + after_sep.replace('.', '')
             try:
                 return float(thousands_part)
             except ValueError:
                 return None
         else:
-            # Ambiguous case: try common normalizations
+            # Caso ambiguo: intentar normalizaciones comunes
             try:
                 normalized = cleaned.replace(',', '.')
                 return float(normalized)
@@ -338,15 +338,15 @@ class MercadoLibreSpider(scrapy.Spider):
 
     def _extract_next_link(self, response):
         """
-        Extract next page URL from MercadoLibre pagination controls.
+        Extraiga la URL de la página siguiente de los controles de paginación de MercadoLibre.
 
-        Attempts to find the "Next" button link in the pagination section.
+        Intenta encontrar el enlace del botón "Siguiente" en la sección de paginación.
 
         Args:
-            response: Current page response.
+            response: Respuesta de la página actual.
 
         Returns:
-            str or None: Absolute URL for next page, or None if not found.
+            str or None: URL absoluta de la siguiente página, o Ninguno si no se encuentra.
         """
         try:
             href = response.css(
@@ -361,23 +361,22 @@ class MercadoLibreSpider(scrapy.Spider):
 
     def _compute_next_meli_url(self, current_url):
         """
-        Compute next page URL when direct link extraction fails.
+        Calcular la URL de la página siguiente cuando falla la extracción del enlace directo.
 
-        Implements fallback pagination logic for MercadoLibre's URL patterns:
-        - Updates _Desde_ parameters in path
-        - Adds pagination parameters to query string
-
+        Implementa la lógica de paginación de reserva para los patrones de URL de MercadoLibre:
+        - Actualiza los parámetros _Desde_ en la ruta
+        - Agrega parámetros de paginación a la cadena de consulta
         Args:
-            current_url: Current page URL as string.
+            current_url: URL de la página actual como cadena.
 
         Returns:
-            str or None: Computed next page URL, or None if computation fails.
+            str or None: URL calculada de la página siguiente, o Ninguno si el cálculo falla.
         """
         try:
             parsed = urlparse(current_url)
             path = parsed.path or ''
 
-            # Case 1: Update existing _Desde_ parameter in path
+            # Caso 1: actualizar el parámetro _Desde_ existente en la ruta
             m = re.search(r"(_Desde_)(\d+)", path)
             if m:
                 prefix, num = m.group(1), int(m.group(2))
@@ -385,13 +384,13 @@ class MercadoLibreSpider(scrapy.Spider):
                 new_path = re.sub(r"(_Desde_)\d+", f"{prefix}{new_num}", path)
                 return urlunparse(parsed._replace(path=new_path, query='', fragment=''))
 
-            # Case 2: Add _Desde_ parameter to path slug
+            # Caso 2: Agregar parámetro _Desde_ al slug de la ruta
             if path and not path.endswith('/'):
                 start = self.ITEMS_PER_PAGE + 1
                 new_path = f"{path}_Desde_{start}_NoIndex_True"
                 return urlunparse(parsed._replace(path=new_path, query='', fragment=''))
 
-            # Case 3: Use query parameter as last resort
+            # Caso 3: Usar parámetro de consulta como último recurso
             q = parse_qs(parsed.query)
             cur = 0
             try:
@@ -406,16 +405,16 @@ class MercadoLibreSpider(scrapy.Spider):
 
     def _is_bad_meli_url(self, url):
         """
-        Detect tracking/redirect URLs that aren't navigable product pages.
+        Detectar URL de seguimiento/redireccionamiento que no sean páginas de productos navegables.
 
-        Filters out MercadoLibre's click tracking domains and redirect URLs
-        that don't lead to actual product pages.
+        Filtra los dominios de seguimiento de clics de MercadoLibre y las URL de redireccionamiento
+        que no conducen a páginas de productos reales.
 
         Args:
-            url: URL string to evaluate.
+            url: Cadena de URL para evaluar.
 
         Returns:
-            bool: True if URL should be skipped, False otherwise.
+            bool: Verdadero si se debe omitir la URL; Falso en caso contrario.
         """
         try:
             p = urlparse(url)

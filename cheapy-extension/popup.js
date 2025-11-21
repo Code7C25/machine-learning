@@ -1,13 +1,12 @@
 /**
- * Script del Popup de la Extensión Chrome Cheapy
+ * Cheapy Chrome Extension Popup Script
  *
- * Maneja la interfaz de usuario para la extensión de comparación de precios Cheapy.
- * Gestiona la iniciación de búsquedas, consulta de resultados y visualización con
- * capacidades de ordenamiento y filtrado.
+ * Gestiona la interfaz de usuario de la extensión de comparación de precios Cheapy.
+ * Maneja la iniciación de búsquedas, la consulta de resultados y la visualización de resultados con capacidades de ordenación y filtrado.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Referencias a elementos del DOM para manipulación de UI
+    // DOM element references for UI manipulation
     const statusMessage = document.getElementById('status-message');
     const queryTitle = document.getElementById('query-title');
     const recommendationsView = document.getElementById('recommendations-view');
@@ -22,11 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let allResults = [];
 
     /**
-     * Controla el cambio de vista entre diferentes estados de UI.
+     * Controls la conmutación de vistas entre diferentes estados de la interfaz de usuario.
      * @param {string} viewName - La vista a mostrar ('loading', 'recommendations', 'all')
      */
     const switchView = (viewName) => {
-        // Ocultar todos los contenedores principales para empezar con estado limpio
+        // Oculte todos los contenedores principales para comenzar con el estado limpio
         statusMessage.style.display = 'none';
         recommendationsView.style.display = 'none';
         allResultsView.style.display = 'none';
@@ -49,26 +48,26 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Retrieves user's country with local storage caching.
-     * Uses ip-api.com for geolocation with 24-hour cache validity.
-     * @returns {Promise<string>} Country code (e.g., 'AR', 'US')
+     * Recupera el país del usuario con almacenamiento en caché local.
+     * Utiliza ip-api.com para geolocalización con validez de caché de 24 horas.
+     * @returns {Promise<string>} Código de país (por ejemplo, 'AR', 'US')
      */
     const getUserCountry = async () => {
         try {
             const cache = await chrome.storage.local.get(['userCountry', 'countryCacheTimestamp']);
             const now = new Date().getTime();
 
-            // Use cache if valid (less than 24 hours old)
+            // Utilice caché si es válido (menos de 24 horas)
             if (cache.userCountry && cache.countryCacheTimestamp &&
                 (now - cache.countryCacheTimestamp < 86400000)) {
                 console.log("Country from extension cache:", cache.userCountry);
                 return cache.userCountry;
             }
 
-            // Fetch from API if no valid cache exists
-            console.log("Calling geolocation API from extension...");
+            // Obtenga datos de la API si no existe caché válida
+            console.log("Llamando a la API de geolocalización desde la extensión...");
             const response = await fetch("http://ip-api.com/json/?fields=countryCode");
-            if (!response.ok) return "AR"; // Fallback to Argentina
+            if (!response.ok) return "AR"; // Valor predeterminado a Argentina
 
             const data = await response.json();
             const country = data.countryCode || "AR";
@@ -78,17 +77,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 userCountry: country,
                 countryCacheTimestamp: now
             });
-            console.log("Country saved to extension cache:", country);
+            console.log("País guardado en la caché de la extensión:", country);
             return country;
         } catch (error) {
-            console.error("Geolocation error from frontend:", error);
-            return "AR"; // Fallback on error
+            console.error("Error de geolocalización desde el frontend:", error);
+            return "AR"; // Respaldo en caso de error
         }
     };
 
     /**
-     * Initializes the extension popup.
-     * Retrieves last search query and user's country, then performs search if available.
+     * Inicializa el popup de la extensión.
+     * Recupera la última consulta de búsqueda y el país del usuario, luego realiza la búsqueda si está disponible.
      */
     const initialize = async () => {
         const country = await getUserCountry();
@@ -107,9 +106,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Initiates product search by calling the backend API.
-     * @param {string} query - Search query string
-     * @param {string} country - User's country code
+     * Inicia la búsqueda de productos llamando a la API del backend.
+     * @param {string} query - Cadena de consulta de búsqueda
+     * @param {string} country - Código de país del usuario
      */
     const performSearch = async (query, country) => {
         statusMessage.textContent = `Analizando "${query}"...`;
@@ -136,9 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Polls backend for search results completion.
-     * @param {string} taskId - Task ID from search initiation
-     * @param {number} attempt - Current polling attempt number
+     * Consulta al backend para la finalización de los resultados de búsqueda.
+     * @param {string} taskId - ID de tarea desde el inicio de la búsqueda
+     * @param {number} attempt - Número actual de intento de sondeo
      */
     const pollForResult = async (taskId, attempt = 1) => {
         const maxAttempts = 45;
@@ -164,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (resultData.status === 'FAILURE') {
                 statusMessage.textContent = "Ocurrió un error en el servidor.";
                 switchView('loading');
-            } else { // PENDING
+            } else { // PENDIENTE
                 statusMessage.textContent = `Procesando... (${resultData.completed || '0/?'})`;
                 setTimeout(() => pollForResult(taskId, attempt + 1), 2000);
             }
@@ -174,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Event listeners for UI controls
+    // Oyentes de eventos para controles de UI
     sortSelect.addEventListener('change', () => displayAllResults());
     similarityCheckbox.addEventListener('change', () => displayAllResults());
 
@@ -188,12 +187,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /**
-     * Displays top recommendations (cheapest and best value products).
+     * Muestra las principales recomendaciones (productos más baratos y mejor relación calidad-precio).
      */
     const displayRecommendations = () => {
         recommendationsSection.innerHTML = '';
 
-        // Find cheapest product prioritizing similarity
+        // Encuentra el producto más barato priorizando la similitud
         const cheapest = [...allResults].sort((a, b) => {
             const simA = a.similarity_score || 0;
             const simB = b.similarity_score || 0;
@@ -201,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return a.price_numeric - b.price_numeric;
         })[0];
 
-        // Find best value product (high rating/reviews, prioritizing similarity)
+        // Encuentra el producto con mejor relación calidad-precio (alta calificación/reseñas, priorizando similitud)
         const bestValue = [...allResults]
             .filter(item => item.reviews_count > 0)
             .sort((a, b) => {
@@ -212,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return b.reviews_count - a.reviews_count;
             })[0] || cheapest;
 
-        // Display recommendation cards
+        // Muestra las tarjetas de recomendación
         if (cheapest) {
             recommendationsSection.appendChild(
                 createResultCard(cheapest, { label: 'Más Barato', className: 'cheapest' })
@@ -229,47 +228,53 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Muestra todos los resultados de búsqueda con opciones de ordenamiento y filtrado.
-     * Optimizado para rendimiento con separación de criterios de ordenamiento.
+     * Muestra todos los resultados de búsqueda con opciones de ordenación y filtrado.
      */
     const displayAllResults = () => {
         resultsContainer.innerHTML = '';
         const sortedResults = [...allResults];
-
-        // Aplicar ordenamiento por similitud primero si está activado
-        if (similarityCheckbox.checked) {
-            sortedResults.sort((a, b) => (b.similarity_score || 0) - (a.similarity_score || 0));
-        }
-
-        // Aplicar ordenamiento secundario según la selección del usuario
         const sortBy = sortSelect.value;
-        sortedResults.sort((a, b) => {
-            switch (sortBy) {
-                case 'price_asc':
-                    return (a.price_numeric || 0) - (b.price_numeric || 0);
-                case 'price_desc':
-                    return (b.price_numeric || 0) - (a.price_numeric || 0);
-                case 'reviews':
-                    return (b.reviews_count || 0) - (a.reviews_count || 0);
-                case 'deal_desc':
-                    // Ordenar por ofertas primero, luego por porcentaje de descuento
-                    const dealA = a.on_sale === true ? 1 : 0;
-                    const dealB = b.on_sale === true ? 1 : 0;
-                    if (dealB !== dealA) return dealB - dealA;
+        const similarityChecked = similarityCheckbox.checked;
 
-                    const discA = a.discount_percent ||
-                        (a.price_before_numeric && a.price_numeric ?
-                            ((a.price_before_numeric - a.price_numeric) / a.price_before_numeric) * 100 : 0);
-                    const discB = b.discount_percent ||
-                        (b.price_before_numeric && b.price_numeric ?
-                            ((b.price_before_numeric - b.price_numeric) / b.price_before_numeric) * 100 : 0);
-                    return discB - discA;
+        sortedResults.sort((a, b) => {
+            // Prioriza la similitud si la casilla está marcada
+            if (similarityChecked) {
+                const simA = a.similarity_score || 0;
+                const simB = b.similarity_score || 0;
+                if (simB !== simA) return simB - simA;
+            }
+
+            // Extrae valores para comparación
+            const priceA = a.price_numeric ?? Infinity;
+            const priceB = b.price_numeric ?? Infinity;
+            const reviewsA = a.reviews_count ?? 0;
+            const reviewsB = b.reviews_count ?? 0;
+            const ratingA = a.rating ?? 0;
+            const ratingB = b.rating ?? 0;
+
+            // Calcula los porcentajes de descuento
+            const discA = (typeof a.discount_percent === 'number') ? a.discount_percent :
+                (a.price_before_numeric && a.price_numeric ?
+                    Math.max(0, ((a.price_before_numeric - a.price_numeric) / a.price_before_numeric) * 100) : 0);
+            const discB = (typeof b.discount_percent === 'number') ? b.discount_percent :
+                (b.price_before_numeric && b.price_numeric ?
+                    Math.max(0, ((b.price_before_numeric - b.price_numeric) / b.price_before_numeric) * 100) : 0);
+
+            // Aplica los criterios de ordenación seleccionados
+            switch (sortBy) {
+                case 'price_asc': return priceA - priceB;
+                case 'price_desc': return priceB - priceA;
+                case 'reviews': return reviewsB - reviewsA;
+                case 'deal_desc':
+                    // Ordena por ofertas primero, luego por porcentaje de descuento
+                    if ((b.on_sale === true) !== (a.on_sale === true)) {
+                        return (b.on_sale === true) ? 1 : -1;
+                    }
+                    return (discB || 0) - (discA || 0);
                 case 'relevance':
                 default:
-                    // Ordenar por rating primero, luego por cantidad de reseñas
-                    const ratingDiff = (b.rating || 0) - (a.rating || 0);
-                    if (ratingDiff !== 0) return ratingDiff;
-                    return (b.reviews_count || 0) - (a.reviews_count || 0);
+                    if (ratingB !== ratingA) { return ratingB - ratingA; }
+                    return reviewsB - reviewsA;
             }
         });
 
@@ -277,10 +282,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Creates a result card element for a product item.
-     * @param {Object} item - Product data object
-     * @param {Object} categoryInfo - Optional category badge info
-     * @returns {HTMLElement} Result card element
+     * crea un elemento de tarjeta de resultados para un artículo de producto. *@param {Objeto} elemento -Objeto de datos del producto *@param {Objeto} categoríaInfo -Información de insignia de categoría opcional
+     * @returns {HTMLElement} Elemento de tarjeta de resultado
      */
     const createResultCard = (item, categoryInfo = {}) => {
         if (!item) return document.createDocumentFragment();
@@ -294,16 +297,16 @@ document.addEventListener('DOMContentLoaded', () => {
         a.className = 'result-card-link';
         a.target = '_blank';
 
-        // Use chrome.tabs.create to open links without activating new tab
+        // Usa chrome.tabs.create para abrir enlaces sin activar una nueva pestaña
         a.addEventListener('click', (event) => {
             event.preventDefault();
             chrome.tabs.create({
                 url: item.url,
-                active: false // Keep focus on current tab
+                active: false // Mantener el foco en la pestaña actual
             });
         });
 
-        // Create image element
+        // Crea el elemento de imagen
         const img = document.createElement('img');
         img.src = item.image_url || 'icons/placeholder.png';
         img.alt = item.title;
@@ -311,29 +314,29 @@ document.addEventListener('DOMContentLoaded', () => {
         img.loading = 'lazy';
         a.appendChild(img);
 
-        // Create text content container
+        // Crea el contenedor de contenido de texto
         const textContent = document.createElement('div');
         textContent.className = 'result-text-content';
 
-        // Add category badge if provided
+        // Añade la insignia de categoría si se proporciona
         let categoryHTML = '';
         if (categoryInfo.label) {
             categoryHTML = `<span class="category-badge ${categoryInfo.className}">${categoryInfo.label}</span>`;
         }
 
-        // Format price display
+        // Formatea la visualización del precio
         const formattedPriceNumeric = item.price_numeric ?
             new Intl.NumberFormat(undefined, {
                 style: 'currency',
                 currency: item.currency || 'USD'
             }).format(item.price_numeric) : null;
 
-        // Prefer backend's cleaned price display
+        // Prefiere la visualización de precio limpia del backend
         const rawPrice = item.price_display ?
             String(item.price_display).trim() :
             (item.price ? String(item.price).trim() : null);
 
-        // Build price HTML with discount handling
+        // Construye el HTML del precio con manejo de descuento
         let priceHTML = '';
         if (item.on_sale && rawPrice) {
             const discountPercent = item.discount_percent ? Math.round(item.discount_percent) : null;
@@ -347,11 +350,11 @@ document.addEventListener('DOMContentLoaded', () => {
             priceHTML = `<span class="item-price">Precio no disponible</span>`;
         }
 
-        // Build reviews text
+        // Construye el texto de reseñas
         const reviewsText = item.reviews_count > 0 ?
             `⭐ ${item.rating || '?'} (${item.reviews_count})` : 'Sin reseñas';
 
-        // Assemble text content HTML
+        // Ensambla el HTML del contenido de texto
         textContent.innerHTML = `${categoryHTML}<span class="item-title">${item.title || 'Título no disponible'}</span><div class="item-details">${priceHTML}<span class="store-name">${item.source || 'Tienda'}</span></div><span class="item-reviews">${reviewsText}</span>`;
 
         a.appendChild(textContent);
@@ -359,6 +362,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return li;
     };
 
-    // Initialize the application
+    // Inicializa la aplicación
     initialize();
 });

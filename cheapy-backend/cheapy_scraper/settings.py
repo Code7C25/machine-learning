@@ -1,7 +1,7 @@
-# Scrapy settings for cheapy_scraper project
+# Configuración de Scrapy para el proyecto cheapy_scraper
 #
-# For simplicity, this file contains only settings considered important or
-# commonly used. You can find more settings consulting the documentation:
+# Para simplificar, este archivo contiene sólo configuraciones consideradas importantes o
+# de uso común. Puedes encontrar más configuraciones consultando la documentación:
 #
 #     https://docs.scrapy.org/en/latest/topics/settings.html
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html

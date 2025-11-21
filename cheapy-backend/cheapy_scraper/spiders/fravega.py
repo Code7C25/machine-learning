@@ -52,14 +52,14 @@ class FravegaSpider(scrapy.Spider):
 
     def parse(self, response):
         """
-        Parse search results page and extract product items.
+        Analice la página de resultados de búsqueda y extraiga elementos de productos.
 
-        Handles Frávega's product listing structure, extracting detailed
-        product information including prices, ratings, and implementing
-        pagination logic.
+        Maneja la estructura del listado de productos de Frávega, extrayendo detalles
+        información del producto, incluidos precios, calificaciones e implementación.
+        lógica de paginación.
 
         Args:
-            response: Scrapy response object for the current page.
+            response: Objeto de respuesta Scrapy para la página actual.
         """
         self.page_count += 1
         self.logger.info(f"Parsing page {self.page_count}/{self.MAX_PAGES} - {response.url}")
@@ -68,18 +68,18 @@ class FravegaSpider(scrapy.Spider):
         self.logger.info(f"Found {len(products)} products on Frávega page.")
 
         for product in products:
-            # Extract basic product URL
+            # Extraer la URL básica del producto
             url = product.css('a::attr(href)').get()
 
-            # Robust rating and review extraction with multiple fallback selectors
+            # Sólida extracción de calificaciones y reseñas con múltiples selectores alternativos
             rating_str = None
             reviews_count_str = None
 
-            # Primary selectors using data attributes
+            # Selectores primarios que utilizan atributos de datos.
             rating_str = product.css('[data-test-id="product-rating"] ::text').get()
             reviews_count_str = product.css('[data-test-id="product-reviews"] ::text').get()
 
-            # Fallback: Extract from aria-label attributes
+            # Respaldo: extracto de los atributos de aria-label
             if not rating_str:
                 aria = product.css('[aria-label]::attr(aria-label)').get()
                 if aria:
@@ -87,17 +87,17 @@ class FravegaSpider(scrapy.Spider):
                     if m:
                         rating_str = m.group(1)
 
-            # Fallback: Generic rating selectors
+            # Alternativa: selectores de calificación genéricos
             if not rating_str:
                 rating_str = product.css('.rating::text, .product-rating::text, .stars::text').get()
 
-            # Extract review counts from various text patterns
+            # Extraiga recuentos de reseñas de varios patrones de texto
             if not reviews_count_str:
                 reviews_count_str = product.css(
                     'span.reviews::text, .review-count::text, .product-review-count::text'
                 ).get()
 
-            # Last resort: Search all text for review-related keywords
+            # Último recurso: busque en todo el texto palabras clave relacionadas con la reseña
             if not reviews_count_str:
                 possible = product.css('::text').getall()
                 if possible:
@@ -106,27 +106,27 @@ class FravegaSpider(scrapy.Spider):
                             reviews_count_str = t.strip()
                             break
 
-            # Clean extracted strings
+            # Cuerdas extraídas limpias
             if rating_str:
                 rating_str = rating_str.strip()
             if reviews_count_str:
                 reviews_count_str = reviews_count_str.strip()
 
-            # Debug logging for successful extractions
+            # Registro de depuración para extracciones exitosas
             if rating_str or reviews_count_str:
                 self.logger.debug(
                     f"Frávega: extracted rating='{rating_str}' "
                     f"reviews='{reviews_count_str}' url={url}"
                 )
 
-            # Advanced price extraction with current/previous price detection
+            # Extracción avanzada de precios con detección de precios actuales/anteriores
             price_container = product.css('div[data-test-id="product-price"]')
 
-            # Collect all monetary text patterns from price container
+            # Recopile todos los patrones de texto monetario del contenedor de precios.
             price_texts = price_container.css('::text').getall()
             money_candidates = []
 
-            # Build monetary candidates with context
+            # Construya candidatos monetarios con contexto
             for idx, t in enumerate(price_texts):
                 if not t or not t.strip():
                     continue
@@ -135,7 +135,7 @@ class FravegaSpider(scrapy.Spider):
                 if not matches:
                     continue
 
-                # Expand context to include neighboring text
+                # Ampliar el contexto para incluir el texto vecino
                 start = max(0, idx-1)
                 end = min(len(price_texts), idx+2)
                 ctx = ' '.join([x.strip() for x in price_texts[start:end] if x and x.strip()])
@@ -148,7 +148,7 @@ class FravegaSpider(scrapy.Spider):
             price_current_text = None
             price_before = None
 
-            # Priority: Extract explicit offer price if available
+            # Prioridad: extraer el precio de oferta explícito si está disponible
             try:
                 offer_span = price_container.css('span.sc-1d9b1d9e-0::text').get()
             except Exception:
@@ -157,7 +157,7 @@ class FravegaSpider(scrapy.Spider):
             if offer_span and re.search(r'[\$€£]\s*[\d\.,]+', offer_span):
                 price_current_text = offer_span.strip()
             else:
-                # Extract from direct spans, avoiding tax-related labels
+                # Extracto de tramos directos, evitando etiquetas fiscales
                 spans = price_container.css('span::text').getall()
                 for s in spans:
                     if not s or not s.strip():
@@ -167,42 +167,42 @@ class FravegaSpider(scrapy.Spider):
                         price_current_text = s.strip()
                         break
 
-            # Convert monetary strings to numeric values
+            # Convertir cadenas monetarias a valores numéricos
             def money_to_float(s):
                 """
-                Convert Frávega's price strings to float values.
+                Convierta las cadenas de precios de Frávega en valores flotantes.
 
-                Handles various Argentine number formats including
-                European-style decimal separators.
+                Maneja varios formatos de números argentinos incluyendo
+                Separadores decimales de estilo europeo.
 
                 Args:
-                    s: Price string (e.g., "$ 1.234.567,89")
+                    s: Cadena de precio (p. ej., "$ 1.234.567,89")
 
                 Returns:
-                    float or None: Parsed numeric value
+                    float or None: Valor numérico analizado
                 """
                 if not s:
                     return None
                 s = re.sub(r'[^\d.,]', '', s)
 
-                # Handle different separator patterns
+                # Manejar diferentes patrones de separador
                 if ',' in s and '.' in s:
-                    # European format: 1.234,56 (thousands.decimal)
+                    # Formato europeo: 1.234,56 (miles.decimal)
                     s = s.replace('.', '').replace(',', '.')
                 elif '.' in s and ',' not in s:
-                    # Dots only: could be thousands (1.234.567) or decimal (1.5)
+                    # Sólo puntos: pueden ser miles (1.234.567) o decimales (1,5)
                     parts = s.split('.')
                     if len(parts[-1]) == 3 and len(parts) > 1:
-                        # Thousands format: 1.234.567
+                        # Formato miles: 1.234.567
                         s = ''.join(parts)
                 elif ',' in s and '.' not in s:
-                    # Commas only: could be thousands (1,234) or decimal (1,5)
+                    # Solo comas: pueden ser miles (1234) o decimales (1,5)
                     parts = s.split(',')
                     if len(parts[-1]) == 3 and len(parts) > 1:
-                        # Thousands format: 1,234,567
+                        # Formato miles: 1.234.567
                         s = ''.join(parts)
                     else:
-                        # Decimal format: 1,5
+                        # Formato decimal: 1,5
                         s = s.replace(',', '.')
 
                 try:
@@ -210,43 +210,43 @@ class FravegaSpider(scrapy.Spider):
                 except Exception:
                     return None
 
-            # Map all monetary candidates to numeric values
+            # Asigna todos los candidatos monetarios a valores numéricos
             money_nums = []
             for txt, ctx in money_candidates:
                 v = money_to_float(txt)
                 if v is not None:
                     money_nums.append((txt, v, ctx))
 
-            # Determine current price
+            # Determinar el precio actual
             price_current = price_current_text
             price_current_numeric = None
             if price_current:
                 price_current_numeric = money_to_float(price_current)
 
-            # Fallback: Infer current price from monetary candidates
+            # Fallback: Inferir el precio actual de los candidatos monetarios
             if price_current_numeric is None and money_nums:
                 visible_candidates = [
                     (t, n, c) for (t, n, c) in money_nums
                     if not re.search(r'precio\s*s/?imp|s/imp|sin\s*imp', c, re.I)
                 ]
                 if visible_candidates:
-                    # Choose lowest visible price (typically the offer price)
+                    # Elija el precio más bajo visible (normalmente el precio de oferta)
                     visible_candidates.sort(key=lambda x: x[1])
                     price_current, price_current_numeric = visible_candidates[0][0], visible_candidates[0][1]
                 else:
-                    # Use lowest global price as fallback
+                    # Utilice el precio global más bajo como alternativa
                     sorted_all = sorted(money_nums, key=lambda x: x[1])
                     price_current, price_current_numeric = sorted_all[0][0], sorted_all[0][1]
 
-            # Determine previous price if significantly higher than current
+            # Determinar el precio anterior si es significativamente más alto que el actual.
             if price_current_numeric is not None and money_nums:
                 greater = [m for m in money_nums if m[1] > price_current_numeric * 1.01]
                 if greater:
-                    # Choose highest previous price
+                    # Elige el precio anterior más alto
                     greater.sort(key=lambda x: x[1], reverse=True)
                     price_before = greater[0][0]
 
-            # Determine if product is discounted
+            # Determinar si el producto tiene descuento.
             is_discounted = False
             try:
                 if price_before is not None and price_current_numeric is not None:
@@ -270,7 +270,7 @@ class FravegaSpider(scrapy.Spider):
                 'country_code': self.country_code,
             }
 
-        # Pagination handling
+        # Manejo de paginación
         try:
             next_href = response.css(
                 'a[data-type="next"]::attr(href), '
@@ -290,16 +290,16 @@ class FravegaSpider(scrapy.Spider):
 
     def _compute_next_fravega_url(self, current_url):
         """
-        Compute next page URL by incrementing page parameter.
+        Calcule la URL de la página siguiente incrementando el parámetro de página.
 
-        Utility method for pagination testing. Increments the 'page'
-        query parameter or adds it if not present.
+        Método de utilidad para pruebas de paginación. Incrementa la 'página'
+        parámetro de consulta o lo agrega si no está presente.
 
         Args:
-            current_url: Current page URL string.
+            current_url: Cadena de URL de la página actual.
 
         Returns:
-            str or None: Next page URL, or None if computation fails.
+            str or None: URL de la página siguiente, o Ninguna si falla el cálculo.
         """
         try:
             from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
