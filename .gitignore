@@ -14,5 +14,12 @@ playwright/.cache/
 # Carpeta de tests
 tests/
 
+# Archivo de configuración de linting
+.hintrc
+
+# Archivos de extensión Chrome empaquetada
+cheapy-extension.crx
+cheapy-extension.pem
+
 # Entorno editor
 .vscode/
