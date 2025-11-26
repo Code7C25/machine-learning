@@ -84,3 +84,4 @@ Actualmente el proyecto se encuentra en **fase de desarrollo funcional**, con in
 ## 🤝 Contribuciones
 
 Este es un proyecto personal para fines académicos, pero cualquier sugerencia o mejora es bienvenida.
+
