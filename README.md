@@ -35,7 +35,7 @@ Actualmente permite obtener resultados de **Mercado Libre**, mostrando precios y
 
 ```bash
 git clone https://github.com/Code7C25/machine-learning
-cd cheapy
+cd cheapy-backend
 ```
 
 ### 2. Configurar el servidor
