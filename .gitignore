@@ -1,0 +1,22 @@
+# Archivo de configuración personal
+config_joa.txt
+
+# Todo lo que sea caché
+__pycache__/
+*.cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.webassets-cache
+playwright/.cache/
+**/playwright/.cache/
+
+# Carpeta de tests
+tests/
+
+# Carpeta de la extensión frontend
+cheapy-extension/cheapy-extension.crx
+cheapy-extension/cheapy-extension.pem
+
+# Entorno editor
+.vscode/
