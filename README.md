@@ -135,7 +135,7 @@ https://youtu.be/iEI9h-xt8FQ?si=a8A7RKm9Te3W6Mxr
 
 - **GitHub:** https://github.com/Code7C25/machine-learning  
 - **Canal de YouTube:** https://www.youtube.com/@Cheapy_extension  
-- **Instagram:** *AGREGAR*  
+- **Instagram:** https://www.instagram.com/appliedenergistic?igsh=bXBmZDBhcmc4Nnd4
 - **Deploy:** *No disponible por el momento*
 
 ---
